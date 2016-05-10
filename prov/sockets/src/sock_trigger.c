@@ -385,12 +385,13 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 				vertex->parent = curr_vertex;
 				vertex->distance = curr_vertex->distance + 1;
 
-				ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
+				ret = sock_explore_vertex(sock_ep, vertex);
 				if (ret)
 					return ret;
 				slist_insert_tail(&vertex->list_entry, &queue);
 			}
 		}
+		slist_insert_tail(&curr_vertex->list_entry, &explored_queue);
 	}
 
 	return 0;

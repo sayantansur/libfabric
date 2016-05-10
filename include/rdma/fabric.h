@@ -116,6 +116,7 @@ typedef struct fid *fid_t;
 #define FI_MORE			(1ULL << 18)
 #define FI_PEEK			(1ULL << 19)
 #define FI_TRIGGER		(1ULL << 20)
+#define FI_SCHEDULE		(1ULL << 20)
 #define FI_FENCE		(1ULL << 21)
 #define FI_SCHEDULE		(1ULL << 22) // can replace FI_TRIGGER
 

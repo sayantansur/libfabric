@@ -270,10 +270,13 @@ struct sock_trigger {
 struct sock_sched {
 	struct fid	fid;
 	struct sock_ep 	*ep;
+<<<<<<< HEAD
 	struct slist    ops; /* sorted queue of op contexts */
 	struct slist	cntrs; /* list of allocated counters */
 	struct fid_cntr *sched_cmp_cntr; /* indicates completion of all ops */
 	uint32_t	num_leaves;
+=======
+>>>>>>> WIP
 };
 
 /* needs to fit in the reserved section
@@ -285,10 +288,19 @@ struct sock_sched_vertex {
 	uint32_t			distance;
 };
 
+<<<<<<< HEAD
 struct sock_sched_ctx {
 	struct sock_trigger		*trig_cmd;
 	struct slist_entry		list_entry;
 	struct fi_triggered_context	trig_ctx;
+=======
+/* cast of struct fi_context */
+struct sock_sched_ctx {
+	struct sock_trigger	*trig_cmd;
+	struct fid_cntr		*trig_cntr;
+	struct fid_cntr		*cmp_cntr;
+	void			*unused;
+>>>>>>> WIP
 };
 
 struct sock_cntr {
@@ -1223,6 +1235,16 @@ int sock_sched_destroy(struct sock_sched *sched);
 
 int sock_sched_start(struct sock_sched *sched);
 void sock_cntr_check_trigger_list(struct sock_cntr *cntr);
+
+int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			   uint64_t flags, uint8_t op_type);
+
+int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
+		struct sock_sched *sock_sched, uint64_t flags, void *context);
+
+int sock_sched_destroy(struct sock_sched *sched);
+
+int sock_sched_start(struct sock_sched *sched);
 
 int sock_epoll_create(struct sock_epoll_set *set, int size);
 int sock_epoll_add(struct sock_epoll_set *set, int fd);
