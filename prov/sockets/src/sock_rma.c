@@ -68,6 +68,7 @@ ssize_t sock_ep_rma_readmsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 	uint64_t total_len, src_len, dst_len, op_flags;
 	struct sock_ep *sock_ep;
 	struct sock_ep_attr *ep_attr;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -107,7 +108,7 @@ ssize_t sock_ep_rma_readmsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_rma_op(ep, msg, flags, SOCK_OP_READ);
+		ret = sock_queue_rma_op(ep, msg, flags, SOCK_OP_READ, &cmp_cntr);
 		if (ret != 1)
 			return ret;
 	}
@@ -130,7 +131,7 @@ ssize_t sock_ep_rma_readmsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 	sock_tx_ctx_write_op_send(tx_ctx, &tx_op, flags,
 			(uintptr_t) msg->context, msg->addr,
 			(uintptr_t) msg->msg_iov[0].iov_base,
-			ep_attr, conn);
+			ep_attr, conn, cmp_cntr);
 
 	src_len = 0;
 	for (i = 0; i < msg->rma_iov_count; i++) {
@@ -232,6 +233,7 @@ ssize_t sock_ep_rma_writemsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 	uint64_t total_len, src_len, dst_len, op_flags;
 	struct sock_ep *sock_ep;
 	struct sock_ep_attr *ep_attr;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -271,7 +273,7 @@ ssize_t sock_ep_rma_writemsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_rma_op(ep, msg, flags, SOCK_OP_WRITE);
+		ret = sock_queue_rma_op(ep, msg, flags, SOCK_OP_WRITE, &cmp_cntr);
 		if (ret != 1)
 			return ret;
 	}
@@ -305,7 +307,8 @@ ssize_t sock_ep_rma_writemsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 
 	sock_tx_ctx_write_op_send(tx_ctx, &tx_op, flags,
 			(uintptr_t) msg->context, msg->addr,
-			(uintptr_t) msg->msg_iov[0].iov_base, ep_attr, conn);
+			(uintptr_t) msg->msg_iov[0].iov_base, ep_attr, conn,
+			cmp_cntr);
 
 	if (flags & FI_REMOTE_CQ_DATA)
 		sock_tx_ctx_write(tx_ctx, &msg->data, sizeof(msg->data));

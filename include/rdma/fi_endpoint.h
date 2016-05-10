@@ -64,6 +64,20 @@ enum {
 	FI_OPT_CM_DATA_SIZE,		/* size_t */
 };
 
+/*
+ * Flags that apply to scheduled operations
+ */
+#define FI_SCHEDULE_PREPOST_RECV	(1ULL<<0)
+
+struct fi_sched {
+	struct fi_context	**ops;
+	struct fi_sched		**edges;
+	uint32_t		num_ops;
+	uint32_t		num_edges;
+	uint64_t		flags;
+	void			*reserved[8];
+};
+
 struct fi_ops_ep {
 	size_t	size;
 	ssize_t	(*cancel)(fid_t fid, void *context);
@@ -79,6 +93,8 @@ struct fi_ops_ep {
 			void *context);
 	ssize_t (*rx_size_left)(struct fid_ep *ep);
 	ssize_t (*tx_size_left)(struct fid_ep *ep);
+	int	(*sched_open)(struct fid_ep *ep, struct fi_sched *sched,
+			struct fid **sched_fid, uint64_t flags, void *context);
 };
 
 struct fi_ops_msg {
@@ -107,7 +123,6 @@ struct fi_ops_cm;
 struct fi_ops_rma;
 struct fi_ops_tagged;
 struct fi_ops_atomic;
-/* struct fi_ops_collectives; */
 
 /*
  * Calls which modify the properties of a endpoint (control, setopt, bind, ...)
@@ -317,6 +332,19 @@ fi_injectdata(struct fid_ep *ep, const void *buf, size_t len,
 		uint64_t data, fi_addr_t dest_addr)
 {
 	return ep->msg->injectdata(ep, buf, len, data, dest_addr);
+}
+
+static inline int
+fi_sched_open(struct fid_ep *ep, struct fi_sched *sched,
+		struct fid **sched_fid, uint64_t flags, void *context)
+{
+	return ep->ops->sched_open(ep, sched, sched_fid, flags, context);
+}
+
+static inline int
+fi_sched_start(struct fid *fid)
+{
+	return fid->ops->control(fid, FI_ENABLE, NULL);
 }
 
 #endif

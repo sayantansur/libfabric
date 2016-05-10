@@ -44,7 +44,8 @@
 #define SOCK_LOG_ERROR(...) _SOCK_LOG_ERROR(FI_LOG_EP_DATA, __VA_ARGS__)
 
 ssize_t sock_queue_rma_op(struct fid_ep *ep, const struct fi_msg_rma *msg,
-			  uint64_t flags, uint8_t op_type)
+			  uint64_t flags, uint8_t op_type,
+			  struct sock_cntr **cmp_cntr)
 {
 	struct sock_cntr *cntr;
 	struct sock_trigger *trigger;
@@ -52,13 +53,20 @@ ssize_t sock_queue_rma_op(struct fid_ep *ep, const struct fi_msg_rma *msg,
 	struct fi_trigger_threshold *threshold;
 
 	trigger_context = (struct fi_triggered_context *) msg->context;
-	if ((flags & FI_INJECT) || !trigger_context ||
-	     (trigger_context->event_type != FI_TRIGGER_THRESHOLD))
+	if ((flags & FI_INJECT) || !trigger_context)
 		return -FI_EINVAL;
 
 	threshold = &trigger_context->trigger.threshold;
-	cntr = container_of(threshold->cntr, struct sock_cntr, cntr_fid);
-	if (atomic_get(&cntr->value) >= threshold->threshold)
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	    trigger_context->event_type == FI_TRIGGER_THRESHOLD_COMPLETION) {
+		*cmp_cntr = container_of(threshold->cmp_cntr, struct sock_cntr, cntr_fid);
+	} else {
+		*cmp_cntr = NULL;
+	}
+
+	cntr = container_of(threshold->trig_cntr, struct sock_cntr, cntr_fid);
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     atomic_get(&cntr->value) >= threshold->threshold)
 		return 1;
 
 	trigger = calloc(1, sizeof(*trigger));
@@ -87,7 +95,8 @@ ssize_t sock_queue_rma_op(struct fid_ep *ep, const struct fi_msg_rma *msg,
 }
 
 ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
-			  uint64_t flags, uint8_t op_type)
+			  uint64_t flags, uint8_t op_type,
+			  struct sock_cntr **cmp_cntr)
 {
 	struct sock_cntr *cntr;
 	struct sock_trigger *trigger;
@@ -95,13 +104,20 @@ ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
 	struct fi_trigger_threshold *threshold;
 
 	trigger_context = (struct fi_triggered_context *) msg->context;
-	if ((flags & FI_INJECT) || !trigger_context ||
-	     (trigger_context->event_type != FI_TRIGGER_THRESHOLD))
+	if ((flags & FI_INJECT) || !trigger_context)
 		return -FI_EINVAL;
 
 	threshold = &trigger_context->trigger.threshold;
-	cntr = container_of(threshold->cntr, struct sock_cntr, cntr_fid);
-	if (atomic_get(&cntr->value) >= threshold->threshold)
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     trigger_context->event_type == FI_TRIGGER_THRESHOLD_COMPLETION) {
+		*cmp_cntr = container_of(threshold->cmp_cntr, struct sock_cntr, cntr_fid);
+	} else {
+		*cmp_cntr = NULL;
+	}
+
+	cntr = container_of(threshold->trig_cntr, struct sock_cntr, cntr_fid);
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     atomic_get(&cntr->value) >= threshold->threshold)
 		return 1;
 
 	trigger = calloc(1, sizeof(*trigger));
@@ -127,7 +143,8 @@ ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
 }
 
 ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
-			   uint64_t flags, uint8_t op_type)
+			   uint64_t flags, uint8_t op_type,
+			   struct sock_cntr **cmp_cntr)
 {
 	struct sock_cntr *cntr;
 	struct sock_trigger *trigger;
@@ -135,13 +152,20 @@ ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 	struct fi_trigger_threshold *threshold;
 
 	trigger_context = (struct fi_triggered_context *) msg->context;
-	if ((flags & FI_INJECT) || !trigger_context ||
-	     (trigger_context->event_type != FI_TRIGGER_THRESHOLD))
+	if ((flags & FI_INJECT) || !trigger_context)
 		return -FI_EINVAL;
 
 	threshold = &trigger_context->trigger.threshold;
-	cntr = container_of(threshold->cntr, struct sock_cntr, cntr_fid);
-	if (atomic_get(&cntr->value) >= threshold->threshold)
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     trigger_context->event_type == FI_TRIGGER_THRESHOLD_COMPLETION) {
+		*cmp_cntr = container_of(threshold->cmp_cntr, struct sock_cntr, cntr_fid);
+	} else {
+		*cmp_cntr = NULL;
+	}
+
+	cntr = container_of(threshold->trig_cntr, struct sock_cntr, cntr_fid);
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     atomic_get(&cntr->value) >= threshold->threshold)
 		return 1;
 
 	trigger = calloc(1, sizeof(*trigger));
@@ -166,10 +190,39 @@ ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 	return 0;
 }
 
+int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			   uint64_t flags, uint8_t op_type)
+{
+	struct sock_trigger *trig_cmd;
+	struct sock_sched_ctx *sched_ctx;
+
+	trig_cmd = calloc(1, sizeof(*trig_cmd));
+	if (!trig_cmd)
+		return -FI_ENOMEM;
+
+	memcpy(&trig_cmd->op.tmsg.msg, msg, sizeof(*msg));
+	trig_cmd->op.tmsg.msg.msg_iov = &trig_cmd->op.tmsg.msg.msg_iov[0];
+	memcpy((void *) &trig_cmd->op.tmsg.msg.msg_iov[0], &msg->msg_iov[0],
+	       msg->iov_count * sizeof(struct iovec));
+
+	trig_cmd->op_type = op_type;
+	trig_cmd->ep = ep;
+	trig_cmd->flags = (flags & ~FI_SCHEDULE);
+
+	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_ctx)
+				<= sizeof(struct fi_context)));
+
+	sched_ctx = (struct sock_sched_ctx *) msg->context;
+	sched_ctx->trig_cmd = trig_cmd;
+
+	return 0;
+}
+
 ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 			     const struct fi_ioc *comparev, size_t compare_count,
 			     struct fi_ioc *resultv, size_t result_count,
-			     uint64_t flags, uint8_t op_type)
+			     uint64_t flags, uint8_t op_type,
+			     struct sock_cntr **cmp_cntr)
 {
 	struct sock_cntr *cntr;
 	struct sock_trigger *trigger;
@@ -177,14 +230,21 @@ ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 	struct fi_trigger_threshold *threshold;
 
 	trigger_context = (struct fi_triggered_context *) msg->context;
-	if ((flags & FI_INJECT) || !trigger_context ||
-	     (trigger_context->event_type != FI_TRIGGER_THRESHOLD))
+	if ((flags & FI_INJECT) || !trigger_context)
 		return -FI_EINVAL;
 
 	threshold = &trigger_context->trigger.threshold;
-	cntr = container_of(threshold->cntr, struct sock_cntr, cntr_fid);
-	if (atomic_get(&cntr->value) >= threshold->threshold)
-		return 1;
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     trigger_context->event_type == FI_TRIGGER_THRESHOLD_COMPLETION) {
+		*cmp_cntr = container_of(threshold->cmp_cntr, struct sock_cntr, cntr_fid);
+	} else {
+		*cmp_cntr = NULL;
+	}
+
+	cntr = container_of(threshold->trig_cntr, struct sock_cntr, cntr_fid);
+	if (trigger_context->event_type == FI_TRIGGER_COMPLETION ||
+	     atomic_get(&cntr->value) >= threshold->threshold)
+ 		return 1;
 
 	trigger = calloc(1, sizeof(*trigger));
 	if (!trigger)
@@ -218,5 +278,96 @@ ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 	dlist_insert_tail(&trigger->entry, &cntr->trigger_list);
 	fastlock_release(&cntr->trigger_lock);
 	sock_cntr_check_trigger_list(cntr);
+	return 0;
+}
+
+int sock_explore_vertex(struct sock_ep *sock_ep, struct sock_sched_vertex *vertex)
+{
+	int i, ret;
+	struct fi_sched *user_vertex;
+	struct sock_sched_ctx *sched_ctx;
+	struct fi_cntr_attr attr = {0};
+
+	user_vertex = container_of(vertex, struct fi_sched, reserved);
+
+	ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
+			&attr, &vertex->cmp_cntr, NULL);
+	if (ret)
+		return ret;
+
+	for(i = 0; i < user_vertex->num_ops; i++) {
+		sched_ctx = (struct sock_sched_ctx *) user_vertex->ops[i];
+		sched_ctx->cmp_cntr = vertex->cmp_cntr;
+		if (vertex->parent)
+			sched_ctx->trig_cntr = vertex->parent->cmp_cntr;
+	}
+
+	return 0;
+}
+
+int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
+		struct sock_sched *sock_sched, uint64_t flags, void *context)
+{
+	int i, ret;
+	struct sock_ep *sock_ep;
+	struct fi_sched *user_vertex;
+	struct slist queue, explored_queue;
+	struct slist_entry *list_entry;
+	struct sock_sched_vertex *vertex, *curr_vertex;
+
+	sock_ep = container_of(ep, struct sock_ep, ep);
+
+	slist_init(&queue);
+	slist_init(&explored_queue);
+
+	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
+				(sizeof(struct fi_sched) -
+				 offsetof(struct fi_sched, reserved))));
+
+	/* initialize root element and enqueue */
+	vertex = (struct sock_sched_vertex *) &sched_tree->reserved[0];
+	vertex->distance = 0;
+	vertex->parent = NULL;
+
+	ret = sock_explore_vertex(sock_ep, vertex);
+	if (ret)
+		return ret;
+
+	slist_insert_tail(&vertex->list_entry, &queue);
+
+	/* BFS: assign distances and parents */
+	while(!slist_empty(&queue)) {
+
+		list_entry = slist_remove_head(&queue);
+		curr_vertex = container_of(list_entry,
+				struct sock_sched_vertex, list_entry);
+		user_vertex = container_of(curr_vertex, struct fi_sched, reserved);
+
+		for(i = 0; i < user_vertex->num_edges; i++) {
+			vertex = (struct sock_sched_vertex *)
+				&user_vertex->edges[i]->reserved[0];
+			if (vertex->distance == UINT32_MAX) {
+				vertex->parent = curr_vertex;
+				vertex->distance = curr_vertex->distance + 1;
+
+				ret = sock_explore_vertex(sock_ep, vertex);
+				if (ret)
+					return ret;
+				slist_insert_tail(&vertex->list_entry, &queue);
+			}
+		}
+		slist_insert_tail(&curr_vertex->list_entry, &explored_queue);
+	}
+
+	return 0;
+}
+
+int sock_sched_destroy(struct sock_sched *sched)
+{
+	return 0;
+}
+
+int sock_sched_start(struct sock_sched *sched)
+{
 	return 0;
 }

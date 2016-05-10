@@ -107,7 +107,6 @@ struct fi_mr_attr {
 struct fi_cq_attr;
 struct fi_cntr_attr;
 
-
 struct fi_ops_domain {
 	size_t	size;
 	int	(*av_open)(struct fid_domain *domain, struct fi_av_attr *attr,

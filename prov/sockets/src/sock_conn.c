@@ -62,6 +62,7 @@ ssize_t sock_conn_send_src_addr(struct sock_ep_attr *ep_attr, struct sock_tx_ctx
 	int ret;
 	uint64_t total_len;
 	struct sock_op tx_op;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	memset(&tx_op, 0, sizeof(struct sock_op));
 	tx_op.op = SOCK_OP_CONN_MSG;
@@ -78,7 +79,7 @@ ssize_t sock_conn_send_src_addr(struct sock_ep_attr *ep_attr, struct sock_tx_ctx
 	}
 
 	sock_tx_ctx_write_op_send(tx_ctx, &tx_op, 0, (uintptr_t) NULL, 0, 0,
-				   ep_attr, conn);
+				   ep_attr, conn, cmp_cntr);
 	sock_tx_ctx_write(tx_ctx, ep_attr->src_addr, sizeof(struct sockaddr_in));
 	sock_tx_ctx_commit(tx_ctx);
 	conn->address_published = 1;

@@ -149,6 +149,9 @@
 #define SOCK_PE_COMM_BUFF_SZ (1024)
 #define SOCK_PE_OVERFLOW_COMM_BUFF_SZ (128)
 
+#define SOCK_COMPILE_ASSERT(x_) \
+	do { switch(0) { case 0: case (x_): default: break; } } while (0)
+
 enum {
 	SOCK_SIGNAL_RD_FD = 0,
 	SOCK_SIGNAL_WR_FD
@@ -262,6 +265,28 @@ struct sock_trigger {
 			size_t result_count;
 		} atomic;
 	} op;
+};
+
+struct sock_sched {
+	struct fid	fid;
+	struct sock_ep 	*ep;
+};
+
+/* needs to fit in the reserved section
+ * of struct fi_sched */
+struct sock_sched_vertex {
+	struct sock_sched_vertex	*parent; /* for BFS */
+	struct slist_entry		list_entry;
+	struct fid_cntr			*cmp_cntr;
+	uint32_t			distance;
+};
+
+/* cast of struct fi_context */
+struct sock_sched_ctx {
+	struct sock_trigger	*trig_cmd;
+	struct fid_cntr		*trig_cntr;
+	struct fid_cntr		*cmp_cntr;
+	void			*unused;
 };
 
 struct sock_cntr {
@@ -583,6 +608,7 @@ struct sock_rx_entry {
 	struct dlist_entry entry;
 	struct slist_entry pool_entry;
 	struct sock_rx_ctx *rx_ctx;
+	struct sock_cntr *cmp_cntr;
 };
 
 struct sock_rx_ctx {
@@ -799,6 +825,7 @@ struct sock_pe_entry {
 	struct dlist_entry ctx_entry;
 	struct ringbuf comm_buf;
 	size_t cache_sz;
+	struct sock_cntr *cmp_cntr;
 };
 
 struct sock_pe {
@@ -1070,15 +1097,15 @@ void sock_tx_ctx_abort(struct sock_tx_ctx *tx_ctx);
 void sock_tx_ctx_write_op_send(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn);
+		struct sock_conn *conn, struct sock_cntr *cntr);
 void sock_tx_ctx_write_op_tsend(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn, uint64_t tag);
+		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag);
 void sock_tx_ctx_read_op_send(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t *flags, uint64_t *context,
 		uint64_t *dest_addr, uint64_t *buf, struct sock_ep_attr **ep_attr,
-		struct sock_conn **conn);
+		struct sock_conn **conn, struct sock_cntr **cntr);
 
 int sock_poll_open(struct fid_domain *domain, struct fi_poll_attr *attr,
 		   struct fid_poll **pollset);
@@ -1167,16 +1194,30 @@ ssize_t sock_ep_tx_atomic(struct fid_ep *ep,
 
 
 ssize_t sock_queue_rma_op(struct fid_ep *ep, const struct fi_msg_rma *msg,
-			  uint64_t flags, uint8_t op_type);
+			  uint64_t flags, uint8_t op_type,
+			  struct sock_cntr **cmp_cntr);
 ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 			     const struct fi_ioc *comparev, size_t compare_count,
 			     struct fi_ioc *resultv, size_t result_count,
-			     uint64_t flags, uint8_t op_type);
+			     uint64_t flags, uint8_t op_type,
+			     struct sock_cntr **cmp_cntr);
 ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
-			   uint64_t flags, uint8_t op_type);
+			   uint64_t flags, uint8_t op_type,
+			   struct sock_cntr **cmp_cntr);
 ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
-			  uint64_t flags, uint8_t op_type);
+			  uint64_t flags, uint8_t op_type,
+			  struct sock_cntr **cmp_cntr);
 void sock_cntr_check_trigger_list(struct sock_cntr *cntr);
+
+int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			   uint64_t flags, uint8_t op_type);
+
+int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
+		struct sock_sched *sock_sched, uint64_t flags, void *context);
+
+int sock_sched_destroy(struct sock_sched *sched);
+
+int sock_sched_start(struct sock_sched *sched);
 
 int sock_epoll_create(struct sock_epoll_set *set, int size);
 int sock_epoll_add(struct sock_epoll_set *set, int fd);

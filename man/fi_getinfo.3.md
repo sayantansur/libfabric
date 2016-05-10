@@ -338,6 +338,11 @@ additional optimizations.
   Endpoints support this capability must meet the usage model as
   described by fi_trigger.3.
 
+*FI_SCHEDULE*
+: Indicates that the endpoint should support scheduled operations.
+  Endpoints that support this capability must meet the usage model
+  as descriped by fi_schedule.3.
+
 *FI_FENCE*
 : Indicates that the endpoint support the FI_FENCE flag on data
   transfer operations.  Support requires tracking that all previous
@@ -359,7 +364,8 @@ Primary capabilities: FI_MSG, FI_RMA, FI_TAGGED, FI_ATOMIC, FI_NAMED_RX_CTX,
 FI_DIRECTED_RECV, FI_READ, FI_WRITE, FI_RECV, FI_SEND, FI_REMOTE_READ,
 and FI_REMOTE_WRITE.
 
-Secondary capabilities: FI_MULTI_RECV, FI_SOURCE, FI_RMA_EVENT, FI_TRIGGER, FI_FENCE.
+Secondary capabilities: FI_MULTI_RECV, FI_SOURCE, FI_RMA_EVENT, FI_TRIGGER,
+FI_SCHEDULE, FI_FENCE.
 
 # MODE
 

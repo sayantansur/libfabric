@@ -41,12 +41,28 @@
 extern "C" {
 #endif
 
+/*
+* FI_TRIGGER_THRESHOLD
+* 	- looks only at trig_cntr; operates like normal triggered operation
+
+* FI_TRIGGER_COMPLETION
+*	- looks only at cmp_cntr; increments the cmp_cntr after this operation
+* 	is completed
+*
+* FI_TRIGGER_THRESHOLD_COMPLETION
+*	- looks for both trig_cntr and cmp_cntr; operates like a normal	triggered
+*	operation, and increments the cmp_cntr after the operation is completed
+*/
+
 enum fi_trigger_event {
 	FI_TRIGGER_THRESHOLD,
+	FI_TRIGGER_COMPLETION,
+	FI_TRIGGER_THRESHOLD_COMPLETION,
 };
 
 struct fi_trigger_threshold {
-	struct fid_cntr		*cntr;
+	struct fid_cntr		*trig_cntr;
+	struct fid_cntr		*cmp_cntr;
 	size_t			threshold;
 };
 
@@ -61,7 +77,7 @@ struct fi_triggered_context {
 	enum fi_trigger_event	event_type;
 	union {
 		struct fi_trigger_threshold	threshold;
-		void				*internal[3];
+		void				*internal[2];
 	} trigger;
 };
 

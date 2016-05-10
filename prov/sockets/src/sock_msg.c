@@ -65,6 +65,7 @@ ssize_t sock_ep_recvmsg(struct fid_ep *ep, const struct fi_msg *msg,
 	struct sock_rx_entry *rx_entry;
 	struct sock_ep *sock_ep;
 	uint64_t op_flags;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -94,7 +95,7 @@ ssize_t sock_ep_recvmsg(struct fid_ep *ep, const struct fi_msg *msg,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_msg_op(ep, msg, flags, SOCK_OP_RECV);
+		ret = sock_queue_msg_op(ep, msg, flags, SOCK_OP_RECV, &cmp_cntr);
 		if (ret != 1)
 			return ret;
 	}
@@ -124,6 +125,7 @@ ssize_t sock_ep_recvmsg(struct fid_ep *ep, const struct fi_msg *msg,
 	rx_entry->data = msg->data;
 	rx_entry->ignore = ~0ULL;
 	rx_entry->is_tagged = 0;
+	rx_entry->cmp_cntr = cmp_cntr;
 
 	for (i = 0; i < msg->iov_count; i++) {
 		rx_entry->iov[i].iov.addr = (uintptr_t) msg->msg_iov[i].iov_base;
@@ -182,6 +184,7 @@ ssize_t sock_ep_sendmsg(struct fid_ep *ep, const struct fi_msg *msg,
 	struct sock_tx_ctx *tx_ctx;
 	struct sock_ep *sock_ep;
 	struct sock_ep_attr *ep_attr;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -224,7 +227,7 @@ ssize_t sock_ep_sendmsg(struct fid_ep *ep, const struct fi_msg *msg,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_msg_op(ep, msg, flags, SOCK_OP_SEND);
+		ret = sock_queue_msg_op(ep, msg, flags, SOCK_OP_SEND, &cmp_cntr);
 		if (ret != 1)
 			return ret;
 	}
@@ -260,7 +263,7 @@ ssize_t sock_ep_sendmsg(struct fid_ep *ep, const struct fi_msg *msg,
 
 	sock_tx_ctx_write_op_send(tx_ctx, &tx_op, flags, (uintptr_t) msg->context,
 			msg->addr, (uintptr_t) msg->msg_iov[0].iov_base,
-			ep_attr, conn);
+			ep_attr, conn, cmp_cntr);
 
 	if (flags & FI_REMOTE_CQ_DATA)
 		sock_tx_ctx_write(tx_ctx, &msg->data, sizeof(msg->data));
@@ -394,6 +397,7 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 	struct sock_rx_entry *rx_entry;
 	struct sock_ep *sock_ep;
 	uint64_t op_flags;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -424,8 +428,13 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 	flags &= ~FI_MULTI_RECV;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TRECV);
+#if 0
+		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TRECV, &cmp_cntr);
 		if (ret != 1)
+			return ret;
+#endif
+		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TRECV);
+		if (ret)
 			return ret;
 	}
 
@@ -456,6 +465,7 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 	rx_entry->tag = msg->tag;
 	rx_entry->ignore = msg->ignore;
 	rx_entry->is_tagged = 1;
+	rx_entry->cmp_cntr = cmp_cntr;
 
 	for (i = 0; i < msg->iov_count; i++) {
 		rx_entry->iov[i].iov.addr = (uintptr_t) msg->msg_iov[i].iov_base;
@@ -521,6 +531,7 @@ ssize_t sock_ep_tsendmsg(struct fid_ep *ep,
 	struct sock_tx_ctx *tx_ctx;
 	struct sock_ep *sock_ep;
 	struct sock_ep_attr *ep_attr;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -560,8 +571,13 @@ ssize_t sock_ep_tsendmsg(struct fid_ep *ep,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TSEND);
+#if 0
+		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TSEND, &cmp_cntr);
 		if (ret != 1)
+			return ret;
+#endif
+		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TSEND);
+		if (ret)
 			return ret;
 	}
 
@@ -596,7 +612,7 @@ ssize_t sock_ep_tsendmsg(struct fid_ep *ep,
 	sock_tx_ctx_write_op_tsend(tx_ctx, &tx_op, flags,
 			(uintptr_t) msg->context, msg->addr,
 			(uintptr_t) msg->msg_iov[0].iov_base,
-			ep_attr, conn, msg->tag);
+			ep_attr, conn, cmp_cntr, msg->tag);
 
 	if (flags & FI_REMOTE_CQ_DATA)
 		sock_tx_ctx_write(tx_ctx, &msg->data, sizeof(msg->data));

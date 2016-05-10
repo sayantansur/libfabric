@@ -80,6 +80,7 @@ struct fid_ep;
 struct fid_pep;
 struct fid_stx;
 struct fid_mr;
+struct fid_sched;
 
 typedef struct fid *fid_t;
 
@@ -115,6 +116,7 @@ typedef struct fid *fid_t;
 #define FI_MORE			(1ULL << 18)
 #define FI_PEEK			(1ULL << 19)
 #define FI_TRIGGER		(1ULL << 20)
+#define FI_SCHEDULE		(1ULL << 20)
 #define FI_FENCE		(1ULL << 21)
 
 #define FI_COMPLETION		(1ULL << 24)
@@ -338,7 +340,8 @@ enum {
 	FI_CLASS_CNTR,
 	FI_CLASS_WAIT,
 	FI_CLASS_POLL,
-	FI_CLASS_CONNREQ
+	FI_CLASS_CONNREQ,
+	FI_CLASS_SCHED
 };
 
 struct fi_eq_attr;

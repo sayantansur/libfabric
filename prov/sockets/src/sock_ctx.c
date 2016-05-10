@@ -183,7 +183,7 @@ void sock_tx_ctx_abort(struct sock_tx_ctx *tx_ctx)
 void sock_tx_ctx_write_op_send(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn)
+		struct sock_conn *conn, struct sock_cntr *cntr)
 {
 	sock_tx_ctx_write(tx_ctx, op, sizeof(*op));
 	sock_tx_ctx_write(tx_ctx, &flags, sizeof(flags));
@@ -192,22 +192,23 @@ void sock_tx_ctx_write_op_send(struct sock_tx_ctx *tx_ctx,
 	sock_tx_ctx_write(tx_ctx, &buf, sizeof(buf));
 	sock_tx_ctx_write(tx_ctx, &ep_attr, sizeof(ep_attr));
 	sock_tx_ctx_write(tx_ctx, &conn, sizeof(conn));
+	sock_tx_ctx_write(tx_ctx, &cntr, sizeof(cntr));
 }
 
 void sock_tx_ctx_write_op_tsend(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn, uint64_t tag)
+		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag)
 {
 	sock_tx_ctx_write_op_send(tx_ctx, op, flags, context, dest_addr,
-			buf, ep_attr, conn);
+			buf, ep_attr, conn, cntr);
 	sock_tx_ctx_write(tx_ctx, &tag, sizeof(tag));
 }
 
 void sock_tx_ctx_read_op_send(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t *flags, uint64_t *context,
 		uint64_t *dest_addr, uint64_t *buf, struct sock_ep_attr **ep_attr,
-		struct sock_conn **conn)
+		struct sock_conn **conn, struct sock_cntr **cntr)
 {
 	rbread(&tx_ctx->rb, op, sizeof(*op));
 	rbread(&tx_ctx->rb, flags, sizeof(*flags));
@@ -216,4 +217,5 @@ void sock_tx_ctx_read_op_send(struct sock_tx_ctx *tx_ctx,
 	rbread(&tx_ctx->rb, buf, sizeof(*buf));
 	rbread(&tx_ctx->rb, ep_attr, sizeof(*ep_attr));
 	rbread(&tx_ctx->rb, conn, sizeof(*conn));
+	rbread(&tx_ctx->rb, cntr, sizeof(*cntr));
 }

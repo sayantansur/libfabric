@@ -576,6 +576,74 @@ static ssize_t sock_tx_size_left(struct fid_ep *ep)
 	return num_left;
 }
 
+static int sock_sched_close(struct fid *fid)
+{
+	struct sock_sched *sock_sched;
+
+	switch (fid->fclass) {
+	case FI_CLASS_SCHED:
+		sock_sched = container_of(fid, struct sock_sched, fid);
+		return sock_sched_destroy(sock_sched);
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+}
+
+static int sock_sched_control(struct fid *fid, int command, void *arg)
+{
+	struct sock_sched *sock_sched;
+
+	switch (fid->fclass) {
+	case FI_CLASS_SCHED:
+		sock_sched = container_of(fid, struct sock_sched, fid);
+		if (command == FI_ENABLE)
+			return sock_sched_start(sock_sched);
+		else
+			return -FI_EINVAL;
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+
+	return 0;
+}
+
+static struct fi_ops sched_ops = {
+	.size = sizeof(struct fi_ops),
+	.close = sock_sched_close,
+	.bind = fi_no_bind,
+	.control = sock_sched_control,
+	.ops_open = fi_no_ops_open,
+};
+
+static int sock_sched_open(struct fid_ep *ep, struct fi_sched *sched,
+		struct fid **sched_fid, uint64_t flags, void *context)
+{
+	int ret;
+	struct sock_sched *sock_sched;
+	struct sock_ep *sock_ep;
+
+	sock_sched = calloc(1, sizeof(*sock_sched));
+	if (!sock_sched)
+		return -FI_ENOMEM;
+
+	sock_sched->fid.fclass = FI_CLASS_SCHED;
+	sock_sched->fid.context = context;
+	sock_sched->fid.ops = &sched_ops;
+
+	sock_ep = container_of(ep, struct sock_ep, ep);
+	sock_sched->ep = sock_ep;
+
+	ret = sock_sched_create(ep, sched, sock_sched, flags, context);
+	if (ret)
+		return ret;
+
+	*sched_fid = &sock_sched->fid;
+
+	return 0;
+}
+
 struct fi_ops_ep sock_ctx_ep_ops = {
 	.size = sizeof(struct fi_ops_ep),
 	.cancel = sock_ep_cancel,
@@ -585,6 +653,7 @@ struct fi_ops_ep sock_ctx_ep_ops = {
 	.rx_ctx = fi_no_rx_ctx,
 	.rx_size_left = sock_rx_size_left,
 	.tx_size_left = sock_tx_size_left,
+	.sched_open = sock_sched_open
 };
 
 static int sock_ep_close(struct fid *fid)
@@ -1117,6 +1186,7 @@ struct fi_ops_ep sock_ep_ops = {
 	.rx_ctx = sock_ep_rx_ctx,
 	.rx_size_left = sock_rx_size_left,
 	.tx_size_left = sock_tx_size_left,
+	.sched_open = sock_sched_open
 };
 
 static int sock_verify_tx_attr(const struct fi_tx_attr *attr)

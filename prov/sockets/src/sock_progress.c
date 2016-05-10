@@ -218,6 +218,9 @@ static struct sock_pe_entry *sock_pe_acquire_entry(struct sock_pe *pe)
 static void sock_pe_report_send_cq_completion(struct sock_pe_entry *pe_entry)
 {
 	int ret = 0;
+	if (pe_entry->cmp_cntr)
+		sock_cntr_inc(pe_entry->cmp_cntr);
+
 	if (!(pe_entry->flags & SOCK_NO_COMPLETION)) {
 		if (pe_entry->comp->send_cq &&
 		    (!pe_entry->comp->send_cq_event ||
@@ -244,6 +247,8 @@ static void sock_pe_report_send_completion(struct sock_pe_entry *pe_entry)
 	sock_pe_report_send_cq_completion(pe_entry);
 	if (pe_entry->comp->send_cntr)
 		sock_cntr_inc(pe_entry->comp->send_cntr);
+	if (pe_entry->cmp_cntr)
+		sock_cntr_inc(pe_entry->cmp_cntr);
 }
 
 static void sock_pe_report_recv_cq_completion(struct sock_pe_entry *pe_entry)
@@ -1438,6 +1443,7 @@ static int sock_pe_progress_buffered_rx(struct sock_rx_ctx *rx_ctx)
 		if (rx_buffered->is_tagged)
 			pe_entry.flags |= FI_TAGGED;
 		pe_entry.flags &= ~FI_MULTI_RECV;
+		pe_entry.cmp_cntr = rx_posted->cmp_cntr;
 
 		if (rx_posted->flags & FI_MULTI_RECV) {
 			if (sock_rx_avail_len(rx_posted) < rx_ctx->min_multi_recv) {
@@ -1516,6 +1522,7 @@ static int sock_pe_process_rx_send(struct sock_pe *pe,
 			rx_entry->data = pe_entry->data;
 			rx_entry->ignore = 0;
 			rx_entry->comp = pe_entry->comp;
+			rx_entry->cmp_cntr = NULL;
 
 			if (pe_entry->msg_hdr.flags & FI_REMOTE_CQ_DATA)
 				rx_entry->flags |= FI_REMOTE_CQ_DATA;
@@ -1526,6 +1533,7 @@ static int sock_pe_process_rx_send(struct sock_pe *pe,
 		fastlock_release(&rx_ctx->lock);
 		pe_entry->context = rx_entry->context;
 		pe_entry->pe.rx.rx_entry = rx_entry;
+		pe_entry->cmp_cntr = rx_entry->cmp_cntr;
 	}
 
 	rx_entry = pe_entry->pe.rx.rx_entry;
@@ -2200,6 +2208,7 @@ static void sock_pe_new_rx_entry(struct sock_pe *pe, struct sock_rx_ctx *rx_ctx,
 	pe_entry->ep_attr = ep_attr;
 	pe_entry->is_complete = 0;
 	pe_entry->done_len = 0;
+	pe_entry->cmp_cntr = NULL;
 
 	if (ep_attr->ep_type == FI_EP_MSG || !ep_attr->av)
 		pe_entry->addr = FI_ADDR_NOTAVAIL;
@@ -2250,7 +2259,8 @@ static int sock_pe_new_tx_entry(struct sock_pe *pe, struct sock_tx_ctx *tx_ctx)
 
 	sock_tx_ctx_read_op_send(tx_ctx, &pe_entry->pe.tx.tx_op,
 			&pe_entry->flags, &pe_entry->context, &pe_entry->addr,
-			&pe_entry->buf, &ep_attr, &pe_entry->conn);
+			&pe_entry->buf, &ep_attr, &pe_entry->conn,
+			&pe_entry->cmp_cntr);
 
 	if (pe_entry->pe.tx.tx_op.op == SOCK_OP_TSEND) {
 		rbread(&tx_ctx->rb, &pe_entry->tag, sizeof(pe_entry->tag));

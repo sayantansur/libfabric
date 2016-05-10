@@ -72,6 +72,7 @@ ssize_t sock_ep_tx_atomic(struct fid_ep *ep,
 	uint64_t total_len, src_len, dst_len, cmp_len, op_flags;
 	struct sock_ep *sock_ep;
 	struct sock_ep_attr *ep_attr;
+	struct sock_cntr *cmp_cntr = NULL;
 
 	switch (ep->fid.fclass) {
 	case FI_CLASS_EP:
@@ -113,7 +114,7 @@ ssize_t sock_ep_tx_atomic(struct fid_ep *ep,
 	if (flags & FI_TRIGGER) {
 		ret = sock_queue_atomic_op(ep, msg, comparev, compare_count,
 					resultv, result_count, flags,
-					SOCK_OP_ATOMIC);
+					SOCK_OP_ATOMIC, &cmp_cntr);
 		if (ret != 1)
 			return ret;
 	}
@@ -161,7 +162,7 @@ ssize_t sock_ep_tx_atomic(struct fid_ep *ep,
 
 	sock_tx_ctx_write_op_send(tx_ctx, &tx_op, flags,
 		(uintptr_t) msg->context, msg->addr,
-		(uintptr_t) msg->msg_iov[0].addr, ep_attr, conn);
+		(uintptr_t) msg->msg_iov[0].addr, ep_attr, conn, cmp_cntr);
 
 	if (flags & FI_REMOTE_CQ_DATA)
 		sock_tx_ctx_write(tx_ctx, &msg->data, sizeof(uint64_t));
