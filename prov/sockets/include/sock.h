@@ -1222,6 +1222,7 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 int sock_sched_destroy(struct sock_sched *sched);
 
 int sock_sched_start(struct sock_sched *sched);
+void sock_cntr_check_trigger_list(struct sock_cntr *cntr);
 
 int sock_epoll_create(struct sock_epoll_set *set, int size);
 int sock_epoll_add(struct sock_epoll_set *set, int fd);
