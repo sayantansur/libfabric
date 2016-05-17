@@ -207,13 +207,17 @@ int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 
 	trig_cmd->op_type = op_type;
 	trig_cmd->ep = ep;
-	trig_cmd->flags = (flags & ~FI_SCHEDULE);
+	flags &= ~FI_SCHEDULE;
+	flags |= FI_TRIGGER;
+	trig_cmd->flags = flags;
 
-	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_ctx)
-				<= sizeof(struct fi_context)));
+	sched_ctx = calloc(1, sizeof(*sched_ctx));
+	if (!sched_ctx)
+		return -FI_ENOMEM;
 
-	sched_ctx = (struct sock_sched_ctx *) msg->context;
 	sched_ctx->trig_cmd = trig_cmd;
+
+	((struct fi_context *) msg->context)->internal[0] = sched_ctx;
 
 	return 0;
 }
@@ -281,12 +285,16 @@ ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 	return 0;
 }
 
-int sock_explore_vertex(struct sock_ep *sock_ep, struct sock_sched_vertex *vertex)
+int sock_explore_vertex(struct sock_ep *sock_ep,
+		struct sock_sched *sock_sched,
+		struct sock_sched_vertex *vertex)
 {
 	int i, ret;
-	struct fi_sched *user_vertex;
 	struct sock_sched_ctx *sched_ctx;
 	struct fi_cntr_attr attr = {0};
+	struct fi_sched *user_vertex, *parent_user_vertex;
+	struct fi_triggered_context *trig_ctx;
+	struct sock_cntr *cntr;
 
 	user_vertex = container_of(vertex, struct fi_sched, reserved);
 
@@ -295,11 +303,25 @@ int sock_explore_vertex(struct sock_ep *sock_ep, struct sock_sched_vertex *verte
 	if (ret)
 		return ret;
 
+	cntr = container_of(vertex->cmp_cntr, struct sock_cntr, cntr_fid);
+
+	slist_insert_tail(&cntr->list_entry, &sock_sched->cntrs);
+
 	for(i = 0; i < user_vertex->num_ops; i++) {
-		sched_ctx = (struct sock_sched_ctx *) user_vertex->ops[i];
-		sched_ctx->cmp_cntr = vertex->cmp_cntr;
-		if (vertex->parent)
-			sched_ctx->trig_cntr = vertex->parent->cmp_cntr;
+		sched_ctx = (struct sock_sched_ctx *)
+			user_vertex->ops[i]->internal[0];
+		trig_ctx = &sched_ctx->trig_ctx;
+		trig_ctx->trigger.threshold.cmp_cntr = vertex->cmp_cntr;
+		if (vertex->parent) {
+			parent_user_vertex = (struct fi_sched *)
+				container_of(vertex->parent, struct fi_sched, reserved);
+			trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
+			trig_ctx->trigger.threshold.trig_cntr = vertex->parent->cmp_cntr;
+			trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
+		} else {
+			trig_ctx->event_type = FI_TRIGGER_COMPLETION;
+		}
+		slist_insert_tail(&sched_ctx->list_entry, &sock_sched->ops);
 	}
 
 	return 0;
@@ -311,14 +333,15 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 	int i, ret;
 	struct sock_ep *sock_ep;
 	struct fi_sched *user_vertex;
-	struct slist queue, explored_queue;
+	struct slist queue;
 	struct slist_entry *list_entry;
 	struct sock_sched_vertex *vertex, *curr_vertex;
 
 	sock_ep = container_of(ep, struct sock_ep, ep);
 
 	slist_init(&queue);
-	slist_init(&explored_queue);
+	slist_init(&sock_sched->ops);
+	slist_init(&sock_sched->cntrs);
 
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
 				(sizeof(struct fi_sched) -
@@ -329,7 +352,7 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 	vertex->distance = 0;
 	vertex->parent = NULL;
 
-	ret = sock_explore_vertex(sock_ep, vertex);
+	ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
 	if (ret)
 		return ret;
 
@@ -350,24 +373,73 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 				vertex->parent = curr_vertex;
 				vertex->distance = curr_vertex->distance + 1;
 
-				ret = sock_explore_vertex(sock_ep, vertex);
+				ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
 				if (ret)
 					return ret;
 				slist_insert_tail(&vertex->list_entry, &queue);
 			}
 		}
-		slist_insert_tail(&curr_vertex->list_entry, &explored_queue);
 	}
 
 	return 0;
 }
 
-int sock_sched_destroy(struct sock_sched *sched)
+int sock_sched_destroy(struct sock_sched *sock_sched)
 {
+	int ret;
+	struct sock_cntr *sock_cntr;
+	struct slist_entry *list_entry;
+	struct sock_sched_ctx *sched_ctx;
+
+	while (!slist_empty(&sock_sched->ops)) {
+		list_entry = slist_remove_head(&sock_sched->ops);
+		sched_ctx = container_of(list_entry, struct sock_sched_ctx, list_entry);
+
+		free(sched_ctx->trig_cmd);
+		free(sched_ctx);
+	}
+
+	while (!slist_empty(&sock_sched->cntrs)) {
+		list_entry = slist_remove_head(&sock_sched->cntrs);
+		sock_cntr = container_of(list_entry, struct sock_cntr, list_entry);
+
+		ret = fi_close(&sock_cntr->cntr_fid.fid);
+		if (ret)
+			return ret;
+	}
+
 	return 0;
 }
 
-int sock_sched_start(struct sock_sched *sched)
+int sock_sched_start(struct sock_sched *sock_sched)
 {
+	int ret;
+	struct slist_entry *list_entry;
+	struct sock_sched_ctx *sched_ctx;
+
+	for (list_entry = sock_sched->ops.head; list_entry;
+			list_entry = list_entry->next)
+	{
+		sched_ctx = container_of(list_entry, struct sock_sched_ctx, list_entry);
+		switch(sched_ctx->trig_cmd->op_type) {
+		case SOCK_OP_TSEND:
+			ret = sock_ep_tsendmsg(&sock_sched->ep->ep,
+					&sched_ctx->trig_cmd->op.tmsg.msg,
+					sched_ctx->trig_cmd->flags);
+			if (ret)
+				return ret;
+			break;
+		case SOCK_OP_TRECV:
+			ret = sock_ep_trecvmsg(&sock_sched->ep->ep,
+					&sched_ctx->trig_cmd->op.tmsg.msg,
+					sched_ctx->trig_cmd->flags);
+			if (ret)
+				return ret;
+			break;
+		default:
+			return -FI_ENOSYS;
+		}
+	}
+
 	return 0;
 }

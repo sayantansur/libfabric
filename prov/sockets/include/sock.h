@@ -270,6 +270,8 @@ struct sock_trigger {
 struct sock_sched {
 	struct fid	fid;
 	struct sock_ep 	*ep;
+	struct slist    ops; /* sorted queue of op contexts */
+	struct slist	cntrs; /* list of allocated counters */
 };
 
 /* needs to fit in the reserved section
@@ -281,12 +283,10 @@ struct sock_sched_vertex {
 	uint32_t			distance;
 };
 
-/* cast of struct fi_context */
 struct sock_sched_ctx {
-	struct sock_trigger	*trig_cmd;
-	struct fid_cntr		*trig_cntr;
-	struct fid_cntr		*cmp_cntr;
-	void			*unused;
+	struct sock_trigger		*trig_cmd;
+	struct slist_entry		list_entry;
+	struct fi_triggered_context	trig_ctx;
 };
 
 struct sock_cntr {
@@ -311,6 +311,8 @@ struct sock_cntr {
 	int signal;
 	int is_waiting;
 	int err_flag;
+	/* used by schedule */
+	struct slist_entry list_entry;
 };
 
 struct sock_mr {

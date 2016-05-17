@@ -578,16 +578,22 @@ static ssize_t sock_tx_size_left(struct fid_ep *ep)
 
 static int sock_sched_close(struct fid *fid)
 {
+	int ret;
 	struct sock_sched *sock_sched;
 
 	switch (fid->fclass) {
 	case FI_CLASS_SCHED:
 		sock_sched = container_of(fid, struct sock_sched, fid);
-		return sock_sched_destroy(sock_sched);
+		ret = sock_sched_destroy(sock_sched);
+		if (ret)
+			return ret;
+		free(sock_sched);
 		break;
 	default:
 		return -FI_EINVAL;
 	}
+
+	return 0;
 }
 
 static int sock_sched_control(struct fid *fid, int command, void *arg)
