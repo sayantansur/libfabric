@@ -272,6 +272,8 @@ struct sock_sched {
 	struct sock_ep 	*ep;
 	struct slist    ops; /* sorted queue of op contexts */
 	struct slist	cntrs; /* list of allocated counters */
+	struct fid_cntr *sched_cmp_cntr; /* indicates completion of all ops */
+	uint32_t	num_leaves;
 };
 
 /* needs to fit in the reserved section

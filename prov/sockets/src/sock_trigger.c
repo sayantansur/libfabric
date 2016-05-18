@@ -291,27 +291,33 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 {
 	int i, ret;
 	struct sock_sched_ctx *sched_ctx;
+	struct fid_cntr *cntr;
+	struct sock_cntr *sock_cntr;
 	struct fi_cntr_attr attr = {0};
 	struct fi_sched *user_vertex, *parent_user_vertex;
 	struct fi_triggered_context *trig_ctx;
-	struct sock_cntr *cntr;
 
 	user_vertex = container_of(vertex, struct fi_sched, reserved);
 
-	ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
-			&attr, &vertex->cmp_cntr, NULL);
-	if (ret)
-		return ret;
+	if (user_vertex->num_edges) { /* has children */
+		ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
+				&attr, &cntr, NULL);
+		if (ret)
+			return ret;
+		sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
+		slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
+	} else { /* leaf node */
+		sock_sched->num_leaves++;
+		cntr = sock_sched->sched_cmp_cntr;
+	}
 
-	cntr = container_of(vertex->cmp_cntr, struct sock_cntr, cntr_fid);
-
-	slist_insert_tail(&cntr->list_entry, &sock_sched->cntrs);
+	vertex->cmp_cntr = cntr;
 
 	for(i = 0; i < user_vertex->num_ops; i++) {
 		sched_ctx = (struct sock_sched_ctx *)
 			user_vertex->ops[i]->internal[0];
 		trig_ctx = &sched_ctx->trig_ctx;
-		trig_ctx->trigger.threshold.cmp_cntr = vertex->cmp_cntr;
+		trig_ctx->trigger.threshold.cmp_cntr = cntr;
 		if (vertex->parent) {
 			parent_user_vertex = (struct fi_sched *)
 				container_of(vertex->parent, struct fi_sched, reserved);
@@ -334,6 +340,7 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 	struct sock_ep *sock_ep;
 	struct fi_sched *user_vertex;
 	struct slist queue;
+	struct fi_cntr_attr attr = {0};
 	struct slist_entry *list_entry;
 	struct sock_sched_vertex *vertex, *curr_vertex;
 
@@ -342,6 +349,11 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 	slist_init(&queue);
 	slist_init(&sock_sched->ops);
 	slist_init(&sock_sched->cntrs);
+
+	ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
+			&attr, &sock_sched->sched_cmp_cntr, NULL);
+	if (ret)
+		return ret;
 
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
 				(sizeof(struct fi_sched) -
@@ -408,6 +420,10 @@ int sock_sched_destroy(struct sock_sched *sock_sched)
 			return ret;
 	}
 
+	ret = fi_close(&sock_sched->sched_cmp_cntr->fid);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
@@ -425,14 +441,16 @@ int sock_sched_start(struct sock_sched *sock_sched)
 		case SOCK_OP_TSEND:
 			ret = sock_ep_tsendmsg(&sock_sched->ep->ep,
 					&sched_ctx->trig_cmd->op.tmsg.msg,
-					sched_ctx->trig_cmd->flags);
+					sched_ctx->trig_cmd->flags |
+					SOCK_NO_COMPLETION);
 			if (ret)
 				return ret;
 			break;
 		case SOCK_OP_TRECV:
 			ret = sock_ep_trecvmsg(&sock_sched->ep->ep,
 					&sched_ctx->trig_cmd->op.tmsg.msg,
-					sched_ctx->trig_cmd->flags);
+					sched_ctx->trig_cmd->flags |
+					SOCK_NO_COMPLETION);
 			if (ret)
 				return ret;
 			break;
