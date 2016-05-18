@@ -123,6 +123,7 @@ void sock_cntr_check_trigger_list(struct sock_cntr *cntr)
 {
 	struct sock_trigger *trigger;
 	struct dlist_entry *entry;
+	struct sock_cq *cq;
 	int ret = 0;
 
 	fastlock_acquire(&cntr->trigger_lock);
@@ -182,6 +183,23 @@ void sock_cntr_check_trigger_list(struct sock_cntr *cntr)
 					trigger->flags);
 			break;
 
+		case SOCK_OP_CQ:
+			cq = container_of(trigger->op.cq.cq, struct sock_cq, cq_fid);
+			_sock_cq_write(cq, FI_ADDR_NOTAVAIL, &trigger->op.cq.entry,
+				       cq->cq_entry_size);
+			break;
+
+		case SOCK_OP_CNTR_SET:
+		case SOCK_OP_CNTR_ADD:
+			if (trigger->op_type == SOCK_OP_CNTR_SET) {
+				sock_cntr_set(trigger->op.cntr.cntr,
+					      trigger->op.cntr.value);
+			} else {
+				sock_cntr_add(trigger->op.cntr.cntr,
+					      trigger->op.cntr.value);
+			}
+			break;
+
 		default:
 			SOCK_LOG_ERROR("unsupported op\n");
 			ret = 0;
@@ -226,7 +244,7 @@ void sock_cntr_err_inc(struct sock_cntr *cntr)
 	pthread_mutex_unlock(&cntr->mut);
 }
 
-static int sock_cntr_add(struct fid_cntr *cntr, uint64_t value)
+int sock_cntr_add(struct fid_cntr *cntr, uint64_t value)
 {
 	struct sock_cntr *_cntr;
 
@@ -240,7 +258,7 @@ static int sock_cntr_add(struct fid_cntr *cntr, uint64_t value)
 	return 0;
 }
 
-static int sock_cntr_set(struct fid_cntr *cntr, uint64_t value)
+int sock_cntr_set(struct fid_cntr *cntr, uint64_t value)
 {
 	struct sock_cntr *_cntr;
 
@@ -391,12 +409,28 @@ static uint64_t sock_cntr_readerr(struct fid_cntr *cntr)
 	return atomic_get(&_cntr->err_cnt);
 }
 
+int sock_cntr_trig_add(struct fid_cntr *cntr, uint64_t threshold,
+		       struct fid_cntr *target_cntr, uint64_t value)
+{
+	return sock_queue_cntr_op(cntr, threshold, target_cntr,
+				  value, SOCK_OP_CNTR_ADD);
+}
+
+int sock_cntr_trig_set(struct fid_cntr *cntr, uint64_t threshold,
+		       struct fid_cntr *target_cntr, uint64_t value)
+{
+	return sock_queue_cntr_op(cntr, threshold, target_cntr,
+				  value, SOCK_OP_CNTR_SET);
+}
+
 static struct fi_ops_cntr sock_cntr_ops = {
 	.size = sizeof(struct fi_ops_cntr),
 	.readerr = sock_cntr_readerr,
 	.read = sock_cntr_read,
 	.add = sock_cntr_add,
 	.set = sock_cntr_set,
+	.trig_add = sock_cntr_trig_add,
+	.trig_set = sock_cntr_trig_set,
 	.wait = sock_cntr_wait,
 };
 

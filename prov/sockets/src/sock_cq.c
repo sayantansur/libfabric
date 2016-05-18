@@ -158,8 +158,8 @@ static ssize_t sock_cq_entry_size(struct sock_cq *sock_cq)
 	return size;
 }
 
-static ssize_t _sock_cq_write(struct sock_cq *cq, fi_addr_t addr,
-			      const void *buf, size_t len)
+ssize_t _sock_cq_write(struct sock_cq *cq, fi_addr_t addr,
+		       const void *buf, size_t len)
 {
 	ssize_t ret;
 	struct sock_cq_overflow_entry_t *overflow_entry;
@@ -441,6 +441,13 @@ static int sock_cq_signal(struct fid_cq *cq)
 	return 0;
 }
 
+static ssize_t sock_cq_trig_write(struct fid_cq *cq, const void *buf,
+			       struct fid_cntr *trig_cntr, uint64_t threshold)
+
+{
+	return sock_queue_cq_op(cq, buf, trig_cntr, threshold);
+}
+
 static struct fi_ops_cq sock_cq_ops = {
 	.size = sizeof(struct fi_ops_cq),
 	.read = sock_cq_read,
@@ -449,6 +456,7 @@ static struct fi_ops_cq sock_cq_ops = {
 	.sread = sock_cq_sread,
 	.sreadfrom = sock_cq_sreadfrom,
 	.signal = sock_cq_signal,
+	.trig_write = sock_cq_trig_write,
 	.strerror = sock_cq_strerror,
 };
 

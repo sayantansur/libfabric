@@ -264,6 +264,17 @@ struct sock_trigger {
 			struct fi_ioc resultv[SOCK_EP_MAX_IOV_LIMIT];
 			size_t result_count;
 		} atomic;
+
+		struct {
+			struct fid_cq *cq;
+			struct fi_cq_tagged_entry entry;
+		} cq;
+
+		struct {
+			struct fid_cntr *cntr;
+			uint64_t value;
+		} cntr;
+
 	} op;
 };
 
@@ -406,6 +417,10 @@ enum {
 	/* internal */
 	SOCK_OP_RECV,
 	SOCK_OP_TRECV,
+
+	SOCK_OP_CQ,
+	SOCK_OP_CNTR_SET,
+	SOCK_OP_CNTR_ADD,
 };
 
 /*
@@ -1057,7 +1072,8 @@ void sock_cq_add_tx_ctx(struct sock_cq *cq, struct sock_tx_ctx *tx_ctx);
 void sock_cq_remove_tx_ctx(struct sock_cq *cq, struct sock_tx_ctx *tx_ctx);
 void sock_cq_add_rx_ctx(struct sock_cq *cq, struct sock_rx_ctx *rx_ctx);
 void sock_cq_remove_rx_ctx(struct sock_cq *cq, struct sock_rx_ctx *rx_ctx);
-
+ssize_t _sock_cq_write(struct sock_cq *cq, fi_addr_t addr,
+		       const void *buf, size_t len);
 
 int sock_eq_open(struct fid_fabric *fabric, struct fi_eq_attr *attr,
 		struct fid_eq **eq, void *context);
@@ -1073,6 +1089,9 @@ int sock_cntr_open(struct fid_domain *domain, struct fi_cntr_attr *attr,
 void sock_cntr_inc(struct sock_cntr *cntr);
 void sock_cntr_err_inc(struct sock_cntr *cntr);
 int sock_cntr_progress(struct sock_cntr *cntr);
+int sock_cntr_add(struct fid_cntr *cntr, uint64_t value);
+int sock_cntr_set(struct fid_cntr *cntr, uint64_t value);
+
 void sock_cntr_add_tx_ctx(struct sock_cntr *cntr, struct sock_tx_ctx *tx_ctx);
 void sock_cntr_remove_tx_ctx(struct sock_cntr *cntr, struct sock_tx_ctx *tx_ctx);
 void sock_cntr_add_rx_ctx(struct sock_cntr *cntr, struct sock_rx_ctx *rx_ctx);
@@ -1212,6 +1231,11 @@ ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
 			  uint64_t flags, uint8_t op_type,
 			  struct sock_cntr **cmp_cntr);
 void sock_cntr_check_trigger_list(struct sock_cntr *cntr);
+ssize_t sock_queue_cq_op(struct fid_cq *cq, const void *buf,
+			 struct fid_cntr *cntr, uint64_t threshold);
+ssize_t sock_queue_cntr_op(struct fid_cntr *cntr, uint64_t threshold,
+			   struct fid_cntr *target_cntr, uint64_t value,
+			   uint8_t op_type);
 
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type);
@@ -1222,7 +1246,6 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 int sock_sched_destroy(struct sock_sched *sched);
 
 int sock_sched_start(struct sock_sched *sched);
-void sock_cntr_check_trigger_list(struct sock_cntr *cntr);
 
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type);

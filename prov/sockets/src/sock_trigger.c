@@ -43,6 +43,70 @@
 #define SOCK_LOG_DBG(...) _SOCK_LOG_DBG(FI_LOG_EP_DATA, __VA_ARGS__)
 #define SOCK_LOG_ERROR(...) _SOCK_LOG_ERROR(FI_LOG_EP_DATA, __VA_ARGS__)
 
+ssize_t sock_queue_cq_op(struct fid_cq *cq, const void *buf,
+			 struct fid_cntr *cntr, uint64_t threshold)
+{
+	struct sock_cq *sock_cq;
+	struct sock_trigger *trigger;
+	struct sock_cntr *sock_cntr;
+
+	sock_cq = container_of(cq, struct sock_cq, cq_fid);
+	sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
+	if (atomic_get(&sock_cntr->value) >= threshold) {
+		_sock_cq_write(sock_cq, FI_ADDR_NOTAVAIL, buf,
+			       sock_cq->cq_entry_size);
+		return 0;
+	}
+
+	trigger = calloc(1, sizeof(*trigger));
+	if (!trigger)
+		return -FI_ENOMEM;
+
+	trigger->threshold = threshold;
+	trigger->op.cq.cq = cq;
+	memcpy(&trigger->op.cq.entry, buf, sock_cq->cq_entry_size);
+	trigger->op_type = SOCK_OP_CQ;
+
+	fastlock_acquire(&sock_cntr->trigger_lock);
+	dlist_insert_tail(&trigger->entry, &sock_cntr->trigger_list);
+	fastlock_release(&sock_cntr->trigger_lock);
+	sock_cntr_check_trigger_list(sock_cntr);
+	return 0;
+}
+
+ssize_t sock_queue_cntr_op(struct fid_cntr *cntr, uint64_t threshold,
+			   struct fid_cntr *target_cntr, uint64_t value,
+			   uint8_t op_type)
+{
+	struct sock_cntr *sock_cntr;
+	struct sock_trigger *trigger;
+
+	sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
+	if (atomic_get(&sock_cntr->value) >= threshold) {
+		if (op_type == SOCK_OP_CNTR_SET) {
+			sock_cntr_set(target_cntr, value);
+		} else {
+			sock_cntr_add(target_cntr, value);
+		}
+		return 0;
+	}
+
+	trigger = calloc(1, sizeof(*trigger));
+	if (!trigger)
+		return -FI_ENOMEM;
+
+	trigger->threshold = threshold;
+	trigger->op.cntr.cntr = target_cntr;
+	trigger->op.cntr.value = value;
+	trigger->op_type = op_type;
+
+	fastlock_acquire(&sock_cntr->trigger_lock);
+	dlist_insert_tail(&trigger->entry, &sock_cntr->trigger_list);
+	fastlock_release(&sock_cntr->trigger_lock);
+	sock_cntr_check_trigger_list(sock_cntr);
+	return 0;
+}
+
 ssize_t sock_queue_rma_op(struct fid_ep *ep, const struct fi_msg_rma *msg,
 			  uint64_t flags, uint8_t op_type,
 			  struct sock_cntr **cmp_cntr)

@@ -250,6 +250,8 @@ struct fi_ops_cq {
 			const void *cond, int timeout);
 	ssize_t	(*sreadfrom)(struct fid_cq *cq, void *buf, size_t count,
 			fi_addr_t *src_addr, const void *cond, int timeout);
+	ssize_t	(*trig_write)(struct fid_cq *cq, const void *buf,
+			 struct fid_cntr *trig_cntr, uint64_t threshold);
 	int	(*signal)(struct fid_cq *cq);
 	const char * (*strerror)(struct fid_cq *cq, int prov_errno,
 			const void *err_data, char *buf, size_t len);
@@ -283,6 +285,10 @@ struct fi_ops_cntr {
 	uint64_t (*readerr)(struct fid_cntr *cntr);
 	int	(*add)(struct fid_cntr *cntr, uint64_t value);
 	int	(*set)(struct fid_cntr *cntr, uint64_t value);
+	int	(*trig_add)(struct fid_cntr *cntr, uint64_t threshold,
+			    struct fid_cntr *target_cntr, uint64_t value);
+	int	(*trig_set)(struct fid_cntr *cntr, uint64_t threshold,
+			    struct fid_cntr *target_cntr, uint64_t value);
 	int	(*wait)(struct fid_cntr *cntr, uint64_t threshold, int timeout);
 };
 
@@ -400,6 +406,13 @@ fi_cq_sreadfrom(struct fid_cq *cq, void *buf, size_t count,
 	return cq->ops->sreadfrom(cq, buf, count, src_addr, cond, timeout);
 }
 
+static inline ssize_t
+fi_cq_trig_write(struct fid_cq *cq, const void *buf,
+	    struct fid_cntr *trig_cntr, uint64_t threshold)
+{
+	return cq->ops->trig_write(cq, buf, trig_cntr, threshold);
+}
+
 static inline int fi_cq_signal(struct fid_cq *cq)
 {
 	return cq->ops->signal(cq);
@@ -431,6 +444,18 @@ static inline int fi_cntr_add(struct fid_cntr *cntr, uint64_t value)
 static inline int fi_cntr_set(struct fid_cntr *cntr, uint64_t value)
 {
 	return cntr->ops->set(cntr, value);
+}
+
+static inline int fi_cntr_trig_add(struct fid_cntr *cntr, uint64_t threshold,
+				   struct fid_cntr *target_cntr, uint64_t value)
+{
+	return cntr->ops->trig_add(cntr, threshold, target_cntr, value);
+}
+
+static inline int fi_cntr_trig_set(struct fid_cntr *cntr, uint64_t threshold,
+				   struct fid_cntr *target_cntr, uint64_t value)
+{
+	return cntr->ops->trig_set(cntr, threshold, target_cntr, value);
 }
 
 static inline int
