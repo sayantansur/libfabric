@@ -371,7 +371,7 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 		sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
 		slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 	} else { /* leaf node */
-		sock_sched->num_leaves++;
+		sock_sched->sched_cmp_threshold += user_vertex->num_ops;
 		cntr = sock_sched->sched_cmp_cntr;
 	}
 
@@ -401,9 +401,10 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 		struct sock_sched *sock_sched, uint64_t flags, void *context)
 {
 	int i, ret;
-	struct sock_ep *sock_ep;
-	struct fi_sched *user_vertex;
 	struct slist queue;
+	struct sock_ep *sock_ep;
+	struct sock_cntr *sock_cntr;
+	struct fi_sched *user_vertex;
 	struct fi_cntr_attr attr = {0};
 	struct slist_entry *list_entry;
 	struct sock_sched_vertex *vertex, *curr_vertex;
@@ -418,6 +419,12 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 			&attr, &sock_sched->sched_cmp_cntr, NULL);
 	if (ret)
 		return ret;
+
+	sock_cntr = container_of(sock_sched->sched_cmp_cntr,
+			struct sock_cntr, cntr_fid);
+	slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
+
+	sock_sched->context = context;
 
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
 				(sizeof(struct fi_sched) -
@@ -484,18 +491,29 @@ int sock_sched_destroy(struct sock_sched *sock_sched)
 			return ret;
 	}
 
-	ret = fi_close(&sock_sched->sched_cmp_cntr->fid);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
 int sock_sched_start(struct sock_sched *sock_sched)
 {
 	int ret;
+	struct fid_cq *cq;
+	struct fi_cq_entry cqe;
+	struct sock_cq *sock_cq;
+	struct sock_cntr *sock_cntr;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
+
+	if (sock_sched->num_used > 0) {
+		/* we need to reset all the completion counters */
+		for (list_entry = sock_sched->cntrs.head; list_entry;
+				list_entry = list_entry->next) {
+			sock_cntr = container_of(list_entry, struct sock_cntr, list_entry);
+			ret = fi_cntr_set(&sock_cntr->cntr_fid, 0);
+			if (ret)
+				return ret;
+		}
+	}
 
 	for (list_entry = sock_sched->ops.head; list_entry;
 			list_entry = list_entry->next)
@@ -522,6 +540,17 @@ int sock_sched_start(struct sock_sched *sock_sched)
 			return -FI_ENOSYS;
 		}
 	}
+
+	sock_cq = sock_sched->ep->attr->tx_ctx->comp.send_cq;
+	cq = &sock_cq->cq_fid;
+
+	cqe.op_context = sock_sched->context;
+
+	ret = fi_cq_trig_write(cq, &cqe,
+			sock_sched->sched_cmp_cntr,
+			sock_sched->sched_cmp_threshold);
+	if (ret)
+		return ret;
 
 	return 0;
 }
