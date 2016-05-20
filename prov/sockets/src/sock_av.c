@@ -221,6 +221,7 @@ static int sock_check_table_in(struct sock_av *_av, struct sockaddr_in *addr,
 		if (!sock_av_is_valid_address(&addr[i])) {
 			if (fi_addr)
 				fi_addr[i] = FI_ADDR_NOTAVAIL;
+			SOCK_LOG_DBG("AV-INSERT: Invalid address\n");
 			sock_av_report_error(_av, context, i, FI_EINVAL);
 			continue;
 		}

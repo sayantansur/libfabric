@@ -435,6 +435,7 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TRECV);
 		if (ret)
 			return ret;
+		return 0;
 	}
 
 	if (flags & FI_PEEK) {
@@ -577,6 +578,7 @@ ssize_t sock_ep_tsendmsg(struct fid_ep *ep,
 		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TSEND);
 		if (ret)
 			return ret;
+		return 0;
 	}
 
 	memset(&tx_op, 0, sizeof(tx_op));
