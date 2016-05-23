@@ -265,8 +265,8 @@ int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 		return -FI_ENOMEM;
 
 	memcpy(&trig_cmd->op.tmsg.msg, msg, sizeof(*msg));
-	trig_cmd->op.tmsg.msg.msg_iov = &trig_cmd->op.tmsg.msg.msg_iov[0];
-	memcpy((void *) &trig_cmd->op.tmsg.msg.msg_iov[0], &msg->msg_iov[0],
+	trig_cmd->op.tmsg.msg.msg_iov = &trig_cmd->op.tmsg.msg_iov[0];
+	memcpy((void *) &trig_cmd->op.tmsg.msg_iov[0], &msg->msg_iov[0],
 	       msg->iov_count * sizeof(struct iovec));
 
 	trig_cmd->op_type = op_type;
