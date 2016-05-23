@@ -254,12 +254,15 @@ static void sock_pe_report_send_completion(struct sock_pe_entry *pe_entry)
 static void sock_pe_report_recv_cq_completion(struct sock_pe_entry *pe_entry)
 {
 	int ret = 0;
-	if (pe_entry->comp->recv_cq &&
-	    (!pe_entry->comp->recv_cq_event ||
-	     (pe_entry->flags & FI_COMPLETION)))
-		ret = pe_entry->comp->recv_cq->report_completion(
-			pe_entry->comp->recv_cq, pe_entry->addr,
-			pe_entry);
+
+	if (!(pe_entry->flags & SOCK_NO_COMPLETION)) {
+		if (pe_entry->comp->recv_cq &&
+				(!pe_entry->comp->recv_cq_event ||
+				 (pe_entry->flags & FI_COMPLETION)))
+			ret = pe_entry->comp->recv_cq->report_completion(
+					pe_entry->comp->recv_cq, pe_entry->addr,
+					pe_entry);
+	}
 
 	if (ret < 0) {
 		SOCK_LOG_ERROR("Failed to report completion %p\n", pe_entry);
