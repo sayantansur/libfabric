@@ -542,6 +542,8 @@ int sock_sched_start(struct sock_sched *sock_sched)
 		}
 	}
 
+	sock_sched->num_used++;
+
 	for (list_entry = sock_sched->ops.head; list_entry;
 			list_entry = list_entry->next)
 	{
