@@ -349,6 +349,40 @@ ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 	return 0;
 }
 
+/* convert a scheduled op to a triggered op equivalent */
+int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
+		struct sock_sched_vertex *vertex)
+{
+	struct fi_triggered_context *trig_ctx;
+	struct fi_sched *parent_user_vertex;
+
+	trig_ctx = &sched_ctx->trig_ctx;
+	trig_ctx->trigger.threshold.cmp_cntr = vertex->cmp_cntr;
+
+	if (vertex->parent) {
+		parent_user_vertex = (struct fi_sched *)
+			container_of(vertex->parent, struct fi_sched, reserved);
+		trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
+		trig_ctx->trigger.threshold.trig_cntr = vertex->parent->cmp_cntr;
+		trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
+	} else {
+		trig_ctx->event_type = FI_TRIGGER_COMPLETION;
+	}
+
+	switch(sched_ctx->trig_cmd->op_type) {
+	case SOCK_OP_TSEND:
+	case SOCK_OP_TRECV:
+		sched_ctx->trig_cmd->op.tmsg.msg.context = trig_ctx;
+		break;
+	default:
+		SOCK_LOG_DBG("op type %d not supported\n",
+				sched_ctx->trig_cmd->op_type);
+		return -FI_EINVAL;
+	}
+
+	return 0;
+}
+
 int sock_explore_vertex(struct sock_ep *sock_ep,
 		struct sock_sched *sock_sched,
 		struct sock_sched_vertex *vertex)
@@ -358,8 +392,7 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	struct fid_cntr *cntr;
 	struct sock_cntr *sock_cntr;
 	struct fi_cntr_attr attr = {0};
-	struct fi_sched *user_vertex, *parent_user_vertex;
-	struct fi_triggered_context *trig_ctx;
+	struct fi_sched *user_vertex;
 
 	user_vertex = container_of(vertex, struct fi_sched, reserved);
 
@@ -380,17 +413,11 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	for(i = 0; i < user_vertex->num_ops; i++) {
 		sched_ctx = (struct sock_sched_ctx *)
 			user_vertex->ops[i]->internal[0];
-		trig_ctx = &sched_ctx->trig_ctx;
-		trig_ctx->trigger.threshold.cmp_cntr = cntr;
-		if (vertex->parent) {
-			parent_user_vertex = (struct fi_sched *)
-				container_of(vertex->parent, struct fi_sched, reserved);
-			trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
-			trig_ctx->trigger.threshold.trig_cntr = vertex->parent->cmp_cntr;
-			trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
-		} else {
-			trig_ctx->event_type = FI_TRIGGER_COMPLETION;
-		}
+
+		ret = sock_convert_to_trigger_op(sched_ctx, vertex);
+		if (ret)
+			return ret;
+
 		slist_insert_tail(&sched_ctx->list_entry, &sock_sched->ops);
 	}
 
