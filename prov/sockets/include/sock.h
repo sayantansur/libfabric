@@ -285,7 +285,7 @@ struct sock_sched {
 	struct slist	cntrs; /* list of allocated cmp counters */
 	struct fid_cntr *sched_cmp_cntr; /* indicates completion of all ops */
 	uint64_t	sched_cmp_threshold; /* when the cmp_cntr is triggered */
-	uint32_t	num_used; /* number of times this was used */
+	uint32_t	used; /* has this schedule been used */
 	void		*context;
 };
 
@@ -295,7 +295,6 @@ struct sock_sched_vertex {
 	struct sock_sched_vertex	*parent; /* for BFS */
 	struct slist_entry		list_entry;
 	struct fid_cntr			*cmp_cntr;
-	uint32_t			distance;
 };
 
 struct sock_sched_ctx {

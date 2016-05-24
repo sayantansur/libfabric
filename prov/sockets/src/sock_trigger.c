@@ -459,7 +459,6 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 
 	/* initialize root element and enqueue */
 	vertex = (struct sock_sched_vertex *) &sched_tree->reserved[0];
-	vertex->distance = 0;
 	vertex->parent = NULL;
 
 	ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
@@ -468,7 +467,7 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 
 	slist_insert_tail(&vertex->list_entry, &queue);
 
-	/* BFS: assign distances and parents */
+	/* BFS */
 	while(!slist_empty(&queue)) {
 
 		list_entry = slist_remove_head(&queue);
@@ -479,15 +478,12 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 		for(i = 0; i < user_vertex->num_edges; i++) {
 			vertex = (struct sock_sched_vertex *)
 				&user_vertex->edges[i]->reserved[0];
-			if (vertex->distance == UINT32_MAX) {
-				vertex->parent = curr_vertex;
-				vertex->distance = curr_vertex->distance + 1;
+			vertex->parent = curr_vertex;
 
-				ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
-				if (ret)
-					return ret;
-				slist_insert_tail(&vertex->list_entry, &queue);
-			}
+			ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
+			if (ret)
+				return ret;
+			slist_insert_tail(&vertex->list_entry, &queue);
 		}
 	}
 
@@ -531,7 +527,7 @@ int sock_sched_start(struct sock_sched *sock_sched)
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
 
-	if (sock_sched->num_used > 0) {
+	if (sock_sched->used) {
 		/* we need to reset all the completion counters */
 		for (list_entry = sock_sched->cntrs.head; list_entry;
 				list_entry = list_entry->next) {
@@ -540,9 +536,9 @@ int sock_sched_start(struct sock_sched *sock_sched)
 			if (ret)
 				return ret;
 		}
+	} else {
+		sock_sched->used = 1;
 	}
-
-	sock_sched->num_used++;
 
 	for (list_entry = sock_sched->ops.head; list_entry;
 			list_entry = list_entry->next)
