@@ -576,57 +576,23 @@ static ssize_t sock_tx_size_left(struct fid_ep *ep)
 	return num_left;
 }
 
-static int sock_sched_close(struct fid *fid)
-{
-	int ret;
-	struct sock_sched *sock_sched;
-
-	switch (fid->fclass) {
-	case FI_CLASS_SCHED:
-		sock_sched = container_of(fid, struct sock_sched, fid);
-		ret = sock_sched_destroy(sock_sched);
-		if (ret)
-			return ret;
-		free(sock_sched);
-		break;
-	default:
-		return -FI_EINVAL;
-	}
-
-	return 0;
-}
-
-static int sock_sched_control(struct fid *fid, int command, void *arg)
-{
-	struct sock_sched *sock_sched;
-
-	switch (fid->fclass) {
-	case FI_CLASS_SCHED:
-		sock_sched = container_of(fid, struct sock_sched, fid);
-		if (command == FI_ENABLE)
-			return sock_sched_start(sock_sched);
-		else
-			return -FI_EINVAL;
-		break;
-	default:
-		return -FI_EINVAL;
-	}
-
-	return 0;
-}
-
 static struct fi_ops sched_ops = {
 	.size = sizeof(struct fi_ops),
 	.close = sock_sched_close,
 	.bind = fi_no_bind,
-	.control = sock_sched_control,
+	.control = fi_no_control,
 	.ops_open = fi_no_ops_open,
 };
 
-static int sock_sched_open(struct fid_ep *ep, struct fi_sched *sched,
-		struct fid **sched_fid, uint64_t flags, void *context)
+static struct fi_ops_sched sched_fid_ops = {
+	.size = sizeof(struct fi_ops_sched),
+	.sched_setup = sock_sched_setup,
+	.sched_run = sock_sched_run
+};
+
+static int sock_sched_open(struct fid_ep *ep, struct fid_sched **sched_fid,
+		void *context)
 {
-	int ret;
 	struct sock_sched *sock_sched;
 	struct sock_ep *sock_ep;
 
@@ -634,18 +600,17 @@ static int sock_sched_open(struct fid_ep *ep, struct fi_sched *sched,
 	if (!sock_sched)
 		return -FI_ENOMEM;
 
-	sock_sched->fid.fclass = FI_CLASS_SCHED;
-	sock_sched->fid.context = context;
-	sock_sched->fid.ops = &sched_ops;
+	sock_sched->sched_fid.fid.fclass = FI_CLASS_SCHED;
+	sock_sched->sched_fid.fid.context = context;
+	sock_sched->sched_fid.fid.ops = &sched_ops;
+
+	sock_sched->sched_fid.ops = &sched_fid_ops;
 
 	sock_ep = container_of(ep, struct sock_ep, ep);
 	sock_sched->ep = sock_ep;
+	sock_sched->context = context;
 
-	ret = sock_sched_create(ep, sched, sock_sched, flags, context);
-	if (ret)
-		return ret;
-
-	*sched_fid = &sock_sched->fid;
+	*sched_fid = &sock_sched->sched_fid;
 
 	return 0;
 }

@@ -354,14 +354,14 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 		struct sock_sched_vertex *vertex)
 {
 	struct fi_triggered_context *trig_ctx;
-	struct fi_sched *parent_user_vertex;
+	struct fi_sched_ops *parent_user_vertex;
 
 	trig_ctx = &sched_ctx->trig_ctx;
 	trig_ctx->trigger.threshold.cmp_cntr = vertex->cmp_cntr;
 
 	if (vertex->parent) {
-		parent_user_vertex = (struct fi_sched *)
-			container_of(vertex->parent, struct fi_sched, reserved);
+		parent_user_vertex = (struct fi_sched_ops *)
+			container_of(vertex->parent, struct fi_sched_ops, reserved);
 		trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
 		trig_ctx->trigger.threshold.trig_cntr = vertex->parent->cmp_cntr;
 		trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
@@ -392,9 +392,9 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	struct fid_cntr *cntr;
 	struct sock_cntr *sock_cntr;
 	struct fi_cntr_attr attr = {0};
-	struct fi_sched *user_vertex;
+	struct fi_sched_ops *user_vertex;
 
-	user_vertex = container_of(vertex, struct fi_sched, reserved);
+	user_vertex = container_of(vertex, struct fi_sched_ops, reserved);
 
 	if (user_vertex->num_edges) { /* has children */
 		ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
@@ -412,7 +412,7 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 
 	for(i = 0; i < user_vertex->num_ops; i++) {
 		sched_ctx = (struct sock_sched_ctx *)
-			user_vertex->ops[i]->internal[0];
+			user_vertex->ops[i].internal[0];
 
 		ret = sock_convert_to_trigger_op(sched_ctx, vertex);
 		if (ret)
@@ -424,19 +424,22 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	return 0;
 }
 
-int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
-		struct sock_sched *sock_sched, uint64_t flags, void *context)
+int sock_sched_setup(struct fid_sched *sched_fid,
+		struct fi_sched_ops *sched_ops, uint64_t flags)
 {
 	int i, ret;
 	struct slist queue;
 	struct sock_ep *sock_ep;
 	struct sock_cntr *sock_cntr;
-	struct fi_sched *user_vertex;
+	struct sock_sched *sock_sched;
+	struct fi_sched_ops *user_vertex;
 	struct fi_cntr_attr attr = {0};
 	struct slist_entry *list_entry;
 	struct sock_sched_vertex *vertex, *curr_vertex;
 
-	sock_ep = container_of(ep, struct sock_ep, ep);
+	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
+
+	sock_ep = sock_sched->ep;
 
 	slist_init(&queue);
 	slist_init(&sock_sched->ops);
@@ -451,14 +454,12 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 			struct sock_cntr, cntr_fid);
 	slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 
-	sock_sched->context = context;
-
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
-				(sizeof(struct fi_sched) -
-				 offsetof(struct fi_sched, reserved))));
+				(sizeof(struct fi_sched_ops) -
+				 offsetof(struct fi_sched_ops, reserved))));
 
 	/* initialize root element and enqueue */
-	vertex = (struct sock_sched_vertex *) &sched_tree->reserved[0];
+	vertex = (struct sock_sched_vertex *) &sched_ops->reserved[0];
 	vertex->parent = NULL;
 
 	ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
@@ -473,11 +474,11 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 		list_entry = slist_remove_head(&queue);
 		curr_vertex = container_of(list_entry,
 				struct sock_sched_vertex, list_entry);
-		user_vertex = container_of(curr_vertex, struct fi_sched, reserved);
+		user_vertex = container_of(curr_vertex, struct fi_sched_ops, reserved);
 
 		for(i = 0; i < user_vertex->num_edges; i++) {
 			vertex = (struct sock_sched_vertex *)
-				&user_vertex->edges[i]->reserved[0];
+				&user_vertex->edges[i].reserved[0];
 			vertex->parent = curr_vertex;
 
 			ret = sock_explore_vertex(sock_ep, sock_sched, vertex);
@@ -490,12 +491,15 @@ int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
 	return 0;
 }
 
-int sock_sched_destroy(struct sock_sched *sock_sched)
+int sock_sched_close(struct fid *fid)
 {
 	int ret;
+	struct sock_sched *sock_sched;
 	struct sock_cntr *sock_cntr;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
+
+	sock_sched = container_of(fid, struct sock_sched, sched_fid);
 
 	while (!slist_empty(&sock_sched->ops)) {
 		list_entry = slist_remove_head(&sock_sched->ops);
@@ -514,18 +518,23 @@ int sock_sched_destroy(struct sock_sched *sock_sched)
 			return ret;
 	}
 
+	free(sock_sched);
+
 	return 0;
 }
 
-int sock_sched_start(struct sock_sched *sock_sched)
+int sock_sched_run(struct fid_sched *sched_fid)
 {
 	int ret;
 	struct fid_cq *cq;
 	struct fi_cq_entry cqe;
 	struct sock_cq *sock_cq;
 	struct sock_cntr *sock_cntr;
+	struct sock_sched *sock_sched;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
+
+	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
 
 	if (sock_sched->used) {
 		/* we need to reset all the completion counters */

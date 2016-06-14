@@ -69,14 +69,27 @@ enum {
  */
 #define FI_SCHEDULE_PREPOST_RECV	(1ULL<<0)
 
-struct fi_sched {
-	struct fi_context	**ops;
-	struct fi_sched		**edges;
+struct fi_sched_ops {
+	struct fi_context	*ops;
 	uint32_t		num_ops;
+	struct fi_sched_ops	*edges;
 	uint32_t		num_edges;
 	uint64_t		flags;
 	void			*reserved[8];
 };
+
+struct fi_ops_sched {
+	size_t	size;
+	int	(*sched_setup)(struct fid_sched *sched,
+			struct fi_sched_ops *schedule, uint64_t flags);
+	int	(*sched_run)(struct fid_sched *sched);
+};
+
+struct fid_sched {
+	struct fid		fid;
+	struct fi_ops_sched	*ops;
+};
+
 
 struct fi_ops_ep {
 	size_t	size;
@@ -93,8 +106,8 @@ struct fi_ops_ep {
 			void *context);
 	ssize_t (*rx_size_left)(struct fid_ep *ep);
 	ssize_t (*tx_size_left)(struct fid_ep *ep);
-	int	(*sched_open)(struct fid_ep *ep, struct fi_sched *sched,
-			struct fid **sched_fid, uint64_t flags, void *context);
+	int	(*sched_open)(struct fid_ep *ep, struct fid_sched **sched_fid,
+			void *context);
 };
 
 struct fi_ops_msg {
@@ -335,16 +348,22 @@ fi_injectdata(struct fid_ep *ep, const void *buf, size_t len,
 }
 
 static inline int
-fi_sched_open(struct fid_ep *ep, struct fi_sched *sched,
-		struct fid **sched_fid, uint64_t flags, void *context)
+fi_sched_open(struct fid_ep *ep, struct fid_sched **sched_fid, void *context)
 {
-	return ep->ops->sched_open(ep, sched, sched_fid, flags, context);
+	return ep->ops->sched_open(ep, sched_fid, context);
 }
 
 static inline int
-fi_sched_start(struct fid *fid)
+fi_sched_setup(struct fid_sched *sched_fid, struct fi_sched_ops *schedule,
+		uint64_t flags)
 {
-	return fid->ops->control(fid, FI_ENABLE, NULL);
+	return sched_fid->ops->sched_setup(sched_fid, schedule, flags);
+}
+
+static inline int
+fi_sched_run(struct fid_sched *sched_fid)
+{
+	return sched_fid->ops->sched_run(sched_fid);
 }
 
 #endif

@@ -279,14 +279,14 @@ struct sock_trigger {
 };
 
 struct sock_sched {
-	struct fid	fid;
-	struct sock_ep 	*ep;
-	struct slist    ops; /* sorted queue of op contexts */
-	struct slist	cntrs; /* list of allocated cmp counters */
-	struct fid_cntr *sched_cmp_cntr; /* indicates completion of all ops */
-	uint64_t	sched_cmp_threshold; /* when the cmp_cntr is triggered */
-	uint32_t	used; /* has this schedule been used */
-	void		*context;
+	struct fid_sched	sched_fid;
+	struct sock_ep		*ep;
+	struct slist		ops; /* sorted queue of op contexts */
+	struct slist		cntrs; /* list of allocated cmp counters */
+	struct fid_cntr		*sched_cmp_cntr; /* indicates completion of all ops */
+	uint64_t		sched_cmp_threshold; /* when the cmp_cntr is triggered */
+	uint32_t		used; /* has this schedule been used */
+	void			*context;
 };
 
 /* needs to fit in the reserved section
@@ -1241,22 +1241,14 @@ ssize_t sock_queue_cntr_op(struct fid_cntr *cntr, uint64_t threshold,
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type);
 
-int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
-		struct sock_sched *sock_sched, uint64_t flags, void *context);
-
-int sock_sched_destroy(struct sock_sched *sched);
-
-int sock_sched_start(struct sock_sched *sched);
-
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type);
 
-int sock_sched_create(struct fid_ep *ep, struct fi_sched *sched_tree,
-		struct sock_sched *sock_sched, uint64_t flags, void *context);
+int sock_sched_setup(struct fid_sched *sched, struct fi_sched_ops *schedule, uint64_t flags);
 
-int sock_sched_destroy(struct sock_sched *sched);
+int sock_sched_close(struct fid *fid);
 
-int sock_sched_start(struct sock_sched *sched);
+int sock_sched_run(struct fid_sched *sched_fid);
 
 int sock_epoll_create(struct sock_epoll_set *set, int size);
 int sock_epoll_add(struct sock_epoll_set *set, int fd);
