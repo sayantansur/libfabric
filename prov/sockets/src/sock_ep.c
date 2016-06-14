@@ -579,7 +579,7 @@ static ssize_t sock_tx_size_left(struct fid_ep *ep)
 static struct fi_ops sched_ops = {
 	.size = sizeof(struct fi_ops),
 	.close = sock_sched_close,
-	.bind = fi_no_bind,
+	.bind = sock_sched_bind,
 	.control = fi_no_control,
 	.ops_open = fi_no_ops_open,
 };

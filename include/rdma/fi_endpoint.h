@@ -199,6 +199,11 @@ static inline int fi_ep_bind(struct fid_ep *ep, struct fid *bfid, uint64_t flags
 	return ep->fid.ops->bind(&ep->fid, bfid, flags);
 }
 
+static inline int fi_sched_bind(struct fid_sched *sched, struct fid *bfid, uint64_t flags)
+{
+	return sched->fid.ops->bind(&sched->fid, bfid, flags);
+}
+
 static inline int fi_pep_bind(struct fid_pep *pep, struct fid *bfid, uint64_t flags)
 {
 	return pep->fid.ops->bind(&pep->fid, bfid, flags);

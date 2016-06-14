@@ -357,13 +357,13 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 	struct fi_sched_ops *parent_user_vertex;
 
 	trig_ctx = &sched_ctx->trig_ctx;
-	trig_ctx->trigger.threshold.cmp_cntr = vertex->cmp_cntr;
+	trig_ctx->trigger.threshold.cmp_cntr = &vertex->cmp_cntr->cntr_fid;
 
 	if (vertex->parent) {
 		parent_user_vertex = (struct fi_sched_ops *)
 			container_of(vertex->parent, struct fi_sched_ops, reserved);
 		trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
-		trig_ctx->trigger.threshold.trig_cntr = vertex->parent->cmp_cntr;
+		trig_ctx->trigger.threshold.trig_cntr = &vertex->parent->cmp_cntr->cntr_fid;
 		trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
 	} else {
 		trig_ctx->event_type = FI_TRIGGER_COMPLETION;
@@ -404,11 +404,11 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 		sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
 		slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 	} else { /* leaf node */
-		sock_sched->sched_cmp_threshold += user_vertex->num_ops;
-		cntr = sock_sched->sched_cmp_cntr;
+		sock_sched->cmp_threshold += user_vertex->num_ops;
+		sock_cntr = sock_sched->cmp_cntr;
 	}
 
-	vertex->cmp_cntr = cntr;
+	vertex->cmp_cntr = sock_cntr;
 
 	for(i = 0; i < user_vertex->num_ops; i++) {
 		sched_ctx = (struct sock_sched_ctx *)
@@ -424,6 +424,33 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	return 0;
 }
 
+int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags)
+{
+	struct sock_sched *sock_sched;
+	struct sock_cntr *sock_cntr;
+
+	switch (fid->fclass) {
+	case FI_CLASS_SCHED:
+		sock_sched = container_of(fid, struct sock_sched, sched_fid.fid);
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+	switch (fid->fclass) {
+	case FI_CLASS_CNTR:
+		sock_cntr = container_of(bfid, struct sock_cntr, cntr_fid.fid);
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+
+	sock_sched = container_of(fid, struct sock_sched, sched_fid);
+
+	sock_sched->cmp_cntr = sock_cntr;
+
+	return 0;
+}
+
 int sock_sched_setup(struct fid_sched *sched_fid,
 		struct fi_sched_ops *sched_ops, uint64_t flags)
 {
@@ -433,25 +460,23 @@ int sock_sched_setup(struct fid_sched *sched_fid,
 	struct sock_cntr *sock_cntr;
 	struct sock_sched *sock_sched;
 	struct fi_sched_ops *user_vertex;
-	struct fi_cntr_attr attr = {0};
 	struct slist_entry *list_entry;
 	struct sock_sched_vertex *vertex, *curr_vertex;
 
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
 
 	sock_ep = sock_sched->ep;
+	sock_cntr = sock_sched->cmp_cntr;
+
+	if (!sock_cntr) {
+		SOCK_LOG_ERROR("No counter bound to schedule\n");
+		return -FI_EINVAL;
+	}
 
 	slist_init(&queue);
 	slist_init(&sock_sched->ops);
 	slist_init(&sock_sched->cntrs);
 
-	ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
-			&attr, &sock_sched->sched_cmp_cntr, NULL);
-	if (ret)
-		return ret;
-
-	sock_cntr = container_of(sock_sched->sched_cmp_cntr,
-			struct sock_cntr, cntr_fid);
 	slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
@@ -581,8 +606,8 @@ int sock_sched_run(struct fid_sched *sched_fid)
 	cqe.op_context = sock_sched->context;
 
 	ret = fi_cq_trig_write(cq, &cqe,
-			sock_sched->sched_cmp_cntr,
-			sock_sched->sched_cmp_threshold);
+			&sock_sched->cmp_cntr->cntr_fid,
+			sock_sched->cmp_threshold);
 	if (ret)
 		return ret;
 

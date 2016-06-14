@@ -283,8 +283,8 @@ struct sock_sched {
 	struct sock_ep		*ep;
 	struct slist		ops; /* sorted queue of op contexts */
 	struct slist		cntrs; /* list of allocated cmp counters */
-	struct fid_cntr		*sched_cmp_cntr; /* indicates completion of all ops */
-	uint64_t		sched_cmp_threshold; /* when the cmp_cntr is triggered */
+	struct sock_cntr	*cmp_cntr; /* indicates completion of all ops */
+	uint64_t		cmp_threshold; /* when the cmp_cntr is triggered */
 	uint32_t		used; /* has this schedule been used */
 	void			*context;
 };
@@ -294,7 +294,7 @@ struct sock_sched {
 struct sock_sched_vertex {
 	struct sock_sched_vertex	*parent; /* for BFS */
 	struct slist_entry		list_entry;
-	struct fid_cntr			*cmp_cntr;
+	struct sock_cntr		*cmp_cntr;
 };
 
 struct sock_sched_ctx {
@@ -1247,6 +1247,8 @@ int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 int sock_sched_setup(struct fid_sched *sched, struct fi_sched_ops *schedule, uint64_t flags);
 
 int sock_sched_close(struct fid *fid);
+
+int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags);
 
 int sock_sched_run(struct fid_sched *sched_fid);
 
