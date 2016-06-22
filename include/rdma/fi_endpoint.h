@@ -65,9 +65,10 @@ enum {
 };
 
 /*
- * Flags that apply to scheduled operations
+ * Flags that apply to scheduled operations (fid_sched)
  */
-#define FI_SCHEDULE_PREPOST_RECV	(1ULL<<0)
+#define FI_SCHED_DISJOINT	(1ULL<<0)
+#define FI_SCHED_REMOTE_READY	(1ULL<<1)
 
 struct fi_sched_ops {
 	struct fi_context	*ops;

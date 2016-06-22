@@ -35,6 +35,7 @@
 
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
+#include <rdma/fi_tagged.h>
 #include <rdma/fi_rma.h>
 
 
@@ -158,12 +159,26 @@ struct fi_ops_atomic {
 			const struct fi_ioc *comparev, void **compare_desc, size_t compare_count,
 			struct fi_ioc *resultv, void **result_desc, size_t result_count,
 			uint64_t flags);
+	ssize_t (*send)(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, enum fi_datatype datatype, enum fi_op op,
+			void *context);
+	ssize_t (*sendmsg)(struct fid_ep *ep, const struct fi_msg *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags);
+	ssize_t (*tsend)(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, uint64_t tag, enum fi_datatype datatype,
+			enum fi_op op, void *context);
+	ssize_t (*tsendmsg)(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags);
 
 	int	(*writevalid)(struct fid_ep *ep,
 			enum fi_datatype datatype, enum fi_op op, size_t *count);
 	int	(*readwritevalid)(struct fid_ep *ep,
 			enum fi_datatype datatype, enum fi_op op, size_t *count);
 	int	(*compwritevalid)(struct fid_ep *ep,
+			enum fi_datatype datatype, enum fi_op op, size_t *count);
+	int	(*sendvalid)(struct fid_ep *ep,
+			enum fi_datatype datatype, enum fi_op op, size_t *count);
+	int	(*tsendvalid)(struct fid_ep *ep,
 			enum fi_datatype datatype, enum fi_op op, size_t *count);
 };
 
@@ -287,6 +302,38 @@ fi_compare_atomicmsg(struct fid_ep *ep,
 			resultv, result_desc, result_count, flags);
 }
 
+static inline ssize_t
+fi_send_atomic(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, enum fi_datatype datatype, enum fi_op op,
+			void *context)
+{
+	return ep->atomic->send(ep, buf, len, desc, dest_addr, datatype,
+			op, context);
+}
+
+static inline ssize_t
+fi_send_atomicmsg(struct fid_ep *ep, const struct fi_msg *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+{
+	return ep->atomic->sendmsg(ep, msg, datatype, op, flags);
+}
+
+static inline ssize_t
+fi_tsend_atomic(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, uint64_t tag, enum fi_datatype datatype,
+			enum fi_op op, void *context)
+{
+	return ep->atomic->tsend(ep, buf, len, desc, dest_addr, tag,
+			datatype, op, context);
+}
+
+static inline ssize_t
+fi_tsend_atomicmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+{
+	return ep->atomic->tsendmsg(ep, msg, datatype, op, flags);
+}
+
 static inline int
 fi_atomicvalid(struct fid_ep *ep,
 	       enum fi_datatype datatype, enum fi_op op, size_t *count)
@@ -306,6 +353,20 @@ fi_compare_atomicvalid(struct fid_ep *ep,
 		       enum fi_datatype datatype, enum fi_op op, size_t *count)
 {
 	return ep->atomic->compwritevalid(ep, datatype, op, count);
+}
+
+static inline int
+fi_send_atomicvalid(struct fid_ep *ep,
+		       enum fi_datatype datatype, enum fi_op op, size_t *count)
+{
+	return ep->atomic->sendvalid(ep, datatype, op, count);
+}
+
+static inline int
+fi_tsend_atomicvalid(struct fid_ep *ep,
+		       enum fi_datatype datatype, enum fi_op op, size_t *count)
+{
+	return ep->atomic->tsendvalid(ep, datatype, op, count);
 }
 
 #endif
