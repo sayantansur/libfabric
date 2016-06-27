@@ -606,4 +606,6 @@ struct fi_ops_atomic sock_ep_atomic = {
 	.writevalid = sock_ep_atomic_valid,
 	.readwritevalid = sock_ep_atomic_valid,
 	.compwritevalid = sock_ep_atomic_valid,
+	.sendvalid = sock_ep_atomic_valid,
+	.tsendvalid = sock_ep_atomic_valid
 };
