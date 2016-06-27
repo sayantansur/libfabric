@@ -555,6 +555,59 @@ static ssize_t sock_ep_atomic_compwritev(struct fid_ep *ep,
 					   SOCK_USE_OP_FLAGS);
 }
 
+static ssize_t sock_ep_atomic_sendmsg(struct fid_ep *ep, const struct fi_msg *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+{
+	return 0;
+}
+
+static ssize_t sock_ep_atomic_send(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, enum fi_datatype datatype, enum fi_op op,
+			void *context)
+{
+	struct fi_msg msg;
+	struct iovec iov;
+
+	iov.iov_base = (void *) buf;
+	iov.iov_len = len;
+	msg.msg_iov = &iov;
+	msg.desc = desc;
+	msg.iov_count = 1;
+	msg.addr = dest_addr;
+	msg.context = context;
+	msg.data = 0;
+
+	return sock_ep_atomic_sendmsg(ep, &msg, datatype, op, SOCK_USE_OP_FLAGS);
+}
+
+static ssize_t sock_ep_atomic_tsendmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
+			enum fi_datatype datatype, enum fi_op op, uint64_t flags)
+{
+	return 0;
+}
+
+static ssize_t sock_ep_atomic_tsend(struct fid_ep *ep, const void *buf, size_t len, void *desc,
+			fi_addr_t dest_addr, uint64_t tag, enum fi_datatype datatype,
+			enum fi_op op, void *context)
+{
+	struct fi_msg_tagged msg;
+	struct iovec iov;
+
+	iov.iov_base = (void *) buf;
+	iov.iov_len = len;
+
+	msg.msg_iov = &iov;
+	msg.desc = desc;
+	msg.iov_count = 1;
+	msg.addr = dest_addr;
+	msg.tag = tag;
+	msg.ignore = 0;
+	msg.context = context;
+	msg.data = 0;
+
+	return sock_ep_atomic_tsendmsg(ep, &msg, datatype, op, SOCK_USE_OP_FLAGS);
+}
+
 static int sock_ep_atomic_valid(struct fid_ep *ep, enum fi_datatype datatype,
 			      enum fi_op op, size_t *count)
 {
@@ -603,6 +656,10 @@ struct fi_ops_atomic sock_ep_atomic = {
 	.compwrite = sock_ep_atomic_compwrite,
 	.compwritev = sock_ep_atomic_compwritev,
 	.compwritemsg = sock_ep_atomic_compwritemsg,
+	.send = sock_ep_atomic_send,
+	.sendmsg = sock_ep_atomic_sendmsg,
+	.tsend = sock_ep_atomic_tsend,
+	.tsendmsg = sock_ep_atomic_tsendmsg,
 	.writevalid = sock_ep_atomic_valid,
 	.readwritevalid = sock_ep_atomic_valid,
 	.compwritevalid = sock_ep_atomic_valid,
