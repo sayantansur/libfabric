@@ -245,9 +245,23 @@ struct sock_trigger {
 		} msg;
 
 		struct {
+			struct fi_msg msg;
+			struct iovec msg_iov[SOCK_EP_MAX_IOV_LIMIT];
+			enum fi_datatype datatype;
+			enum fi_op op;
+		} msg_atomic;
+
+		struct {
 			struct fi_msg_tagged msg;
 			struct iovec msg_iov[SOCK_EP_MAX_IOV_LIMIT];
 		} tmsg;
+
+		struct {
+			struct fi_msg_tagged msg;
+			struct iovec msg_iov[SOCK_EP_MAX_IOV_LIMIT];
+			enum fi_datatype datatype;
+			enum fi_op op;
+		} tmsg_atomic;
 
 		struct {
 			struct fi_msg_rma msg;
