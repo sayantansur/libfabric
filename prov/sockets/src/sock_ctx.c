@@ -198,11 +198,21 @@ void sock_tx_ctx_write_op_send(struct sock_tx_ctx *tx_ctx,
 void sock_tx_ctx_write_op_tsend(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag)
+		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag,
+		enum fi_op op_type, enum fi_datatype datatype)
 {
+	uint32_t _op_type, _dt;
 	sock_tx_ctx_write_op_send(tx_ctx, op, flags, context, dest_addr,
 			buf, ep_attr, conn, cntr);
 	sock_tx_ctx_write(tx_ctx, &tag, sizeof(tag));
+
+	if (op->op == SOCK_OP_TSEND)
+		return;
+
+	_op_type = op_type;
+	_dt = datatype;
+	sock_tx_ctx_write(tx_ctx, &_op_type, sizeof(_op_type));
+	sock_tx_ctx_write(tx_ctx, &_dt, sizeof(_dt));
 }
 
 void sock_tx_ctx_read_op_send(struct sock_tx_ctx *tx_ctx,

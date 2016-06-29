@@ -68,6 +68,7 @@ enum fi_datatype {
 };
 
 enum fi_op {
+	FI_NO_OP,
 	FI_MIN,
 	FI_MAX,
 	FI_SUM,

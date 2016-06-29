@@ -88,6 +88,9 @@
 
 #define SOCK_CQ_DATA_SIZE (sizeof(uint64_t))
 #define SOCK_TAG_SIZE (sizeof(uint64_t))
+#define SOCK_SND_OP_SZ (sizeof(uint32_t))
+#define SOCK_SND_DT_SZ (sizeof(uint32_t))
+#define SOCK_MAX_NETWORK_ADDR_SZ (35)
 
 #define SOCK_PEP_LISTENER_TIMEOUT (10000)
 #define SOCK_CM_COMM_TIMEOUT (2000)
@@ -436,6 +439,7 @@ enum {
 	SOCK_OP_CQ,
 	SOCK_OP_CNTR_SET,
 	SOCK_OP_CNTR_ADD,
+	SOCK_OP_TSEND_OP,
 };
 
 /*
@@ -479,6 +483,8 @@ struct sock_op_tsend {
 	struct sock_ep *ep;
 	struct sock_conn *conn;
 	uint64_t tag;
+	uint32_t op_type;
+	uint32_t datatype;
 };
 
 union sock_iov {
@@ -625,7 +631,11 @@ struct sock_rx_entry {
 	uint8_t is_complete;
 	uint8_t is_tagged;
 	uint8_t is_pool_entry;
-	uint8_t reserved[2];
+	uint8_t reserved[1];
+
+	uint8_t is_snd_op;
+	uint32_t op;
+	uint32_t datatype;
 
 	uint64_t used;
 	uint64_t total_len;
@@ -738,6 +748,8 @@ struct sock_msg_send {
 struct sock_msg_tsend {
 	struct sock_msg_hdr msg_hdr;
 	uint64_t tag;
+	/* uint32_t op; */
+	/* uint32_t datatype */
 	/* user data */
 	/* data */
 };
@@ -838,6 +850,9 @@ struct sock_pe_entry {
 	uint64_t data;
 	uint64_t tag;
 	uint64_t buf;
+
+	uint32_t op;
+	uint32_t datatype;
 
 	uint8_t type;
 	uint8_t is_complete;
@@ -1139,7 +1154,8 @@ void sock_tx_ctx_write_op_send(struct sock_tx_ctx *tx_ctx,
 void sock_tx_ctx_write_op_tsend(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t flags, uint64_t context,
 		uint64_t dest_addr, uint64_t buf, struct sock_ep_attr *ep_attr,
-		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag);
+		struct sock_conn *conn, struct sock_cntr *cntr, uint64_t tag,
+		enum fi_op op_type, enum fi_datatype datatype);
 void sock_tx_ctx_read_op_send(struct sock_tx_ctx *tx_ctx,
 		struct sock_op *op, uint64_t *flags, uint64_t *context,
 		uint64_t *dest_addr, uint64_t *buf, struct sock_ep_attr **ep_attr,
