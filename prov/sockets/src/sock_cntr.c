@@ -148,9 +148,12 @@ void sock_cntr_check_trigger_list(struct sock_cntr *cntr)
 			break;
 
 		case SOCK_OP_TSEND:
-			ret = sock_ep_tsendmsg(trigger->ep,
+		case SOCK_OP_TSEND_OP:
+			ret = sock_ep_tsendmsg_common(trigger->ep,
 					&trigger->op.tmsg.msg,
-					trigger->flags);
+						      trigger->flags,
+						      trigger->op.tmsg.op,
+						      trigger->op.tmsg.datatype);
 			break;
 
 		case SOCK_OP_TRECV:

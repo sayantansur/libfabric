@@ -428,7 +428,8 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 	flags &= ~FI_MULTI_RECV;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TRECV, &cmp_cntr);
+		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TRECV, &cmp_cntr,
+					 FI_NO_OP, FI_UINT8);
 		if (ret != 1)
 			return ret;
 	} else if (flags & FI_SCHEDULE) {
@@ -572,7 +573,9 @@ ssize_t sock_ep_tsendmsg_common(struct fid_ep *ep,
 		flags |= op_flags;
 
 	if (flags & FI_TRIGGER) {
-		ret = sock_queue_tmsg_op(ep, msg, flags, SOCK_OP_TSEND, &cmp_cntr);
+		ret = sock_queue_tmsg_op(ep, msg, flags,
+					 op == FI_NO_OP ? SOCK_OP_TSEND : SOCK_OP_TSEND_OP,
+					 &cmp_cntr, op, datatype);
 		if (ret != 1)
 			return ret;
 	} else if (flags & FI_SCHEDULE) {

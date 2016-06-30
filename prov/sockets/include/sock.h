@@ -256,6 +256,8 @@ struct sock_trigger {
 
 		struct {
 			struct fi_msg_tagged msg;
+			enum fi_op op;
+			enum fi_datatype datatype;
 			struct iovec msg_iov[SOCK_EP_MAX_IOV_LIMIT];
 		} tmsg;
 
@@ -1236,6 +1238,9 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 			 const struct fi_msg_tagged *msg, uint64_t flags);
 ssize_t sock_ep_tsendmsg(struct fid_ep *ep,
 			 const struct fi_msg_tagged *msg, uint64_t flags);
+ssize_t sock_ep_tsendmsg_common(struct fid_ep *ep,
+				const struct fi_msg_tagged *msg, uint64_t flags,
+				enum fi_op op, enum fi_datatype datatype);
 ssize_t sock_ep_rma_readmsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
 			    uint64_t flags);
 ssize_t sock_ep_rma_writemsg(struct fid_ep *ep, const struct fi_msg_rma *msg,
@@ -1257,7 +1262,8 @@ ssize_t sock_queue_atomic_op(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 			     struct sock_cntr **cmp_cntr);
 ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type,
-			   struct sock_cntr **cmp_cntr);
+			   struct sock_cntr **cmp_cntr,
+			   enum fi_op op, enum fi_datatype datatype);
 ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
 			  uint64_t flags, uint8_t op_type,
 			  struct sock_cntr **cmp_cntr);

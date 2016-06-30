@@ -208,7 +208,8 @@ ssize_t sock_queue_msg_op(struct fid_ep *ep, const struct fi_msg *msg,
 
 ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 			   uint64_t flags, uint8_t op_type,
-			   struct sock_cntr **cmp_cntr)
+			   struct sock_cntr **cmp_cntr,
+			   enum fi_op op, enum fi_datatype datatype)
 {
 	struct sock_cntr *cntr;
 	struct sock_trigger *trigger;
@@ -246,6 +247,9 @@ ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 	trigger->op_type = op_type;
 	trigger->ep = ep;
 	trigger->flags = flags;
+
+	trigger->op.tmsg.op = op;
+	trigger->op.tmsg.datatype = datatype;
 
 	fastlock_acquire(&cntr->trigger_lock);
 	dlist_insert_tail(&trigger->entry, &cntr->trigger_list);
