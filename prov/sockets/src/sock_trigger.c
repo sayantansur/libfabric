@@ -259,7 +259,8 @@ ssize_t sock_queue_tmsg_op(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 }
 
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
-			   uint64_t flags, uint8_t op_type)
+			   uint64_t flags, uint8_t op_type,
+			   enum fi_op op, enum fi_datatype datatype)
 {
 	struct sock_trigger *trig_cmd;
 	struct sock_sched_ctx *sched_ctx;
@@ -278,6 +279,9 @@ int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
 	flags &= ~FI_SCHEDULE;
 	flags |= FI_TRIGGER;
 	trig_cmd->flags = flags;
+
+	trig_cmd->op.tmsg.op = op;
+	trig_cmd->op.tmsg.datatype = datatype;
 
 	sched_ctx = calloc(1, sizeof(*sched_ctx));
 	if (!sched_ctx)

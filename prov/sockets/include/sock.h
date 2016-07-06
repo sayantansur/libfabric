@@ -1261,10 +1261,8 @@ ssize_t sock_queue_cntr_op(struct fid_cntr *cntr, uint64_t threshold,
 			   uint8_t op_type);
 
 int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
-			   uint64_t flags, uint8_t op_type);
-
-int sock_create_sched_tmsg(struct fid_ep *ep, const struct fi_msg_tagged *msg,
-			   uint64_t flags, uint8_t op_type);
+			   uint64_t flags, uint8_t op_type,
+			   enum fi_op op, enum fi_datatype datatype);
 
 int sock_sched_setup(struct fid_sched *sched, struct fi_sched_ops *schedule, uint64_t flags);
 

@@ -433,7 +433,8 @@ ssize_t sock_ep_trecvmsg(struct fid_ep *ep,
 		if (ret != 1)
 			return ret;
 	} else if (flags & FI_SCHEDULE) {
-		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TRECV);
+		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TRECV,
+				FI_NO_OP, FI_UINT8);
 		if (ret)
 			return ret;
 		return 0;
@@ -579,7 +580,9 @@ ssize_t sock_ep_tsendmsg_common(struct fid_ep *ep,
 		if (ret != 1)
 			return ret;
 	} else if (flags & FI_SCHEDULE) {
-		ret = sock_create_sched_tmsg(ep, msg, flags, SOCK_OP_TSEND);
+		ret = sock_create_sched_tmsg(ep, msg, flags,
+				op == FI_NO_OP ? SOCK_OP_TSEND : SOCK_OP_TSEND_OP,
+				op, datatype);
 		if (ret)
 			return ret;
 		return 0;

@@ -558,7 +558,7 @@ static ssize_t sock_ep_atomic_compwritev(struct fid_ep *ep,
 static ssize_t sock_ep_atomic_sendmsg(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 			uint64_t flags)
 {
-	return 0;
+	return -FI_ENOSYS;
 }
 
 static ssize_t sock_ep_atomic_send(struct fid_ep *ep, const void *buf, size_t count, void *desc,
@@ -585,7 +585,28 @@ static ssize_t sock_ep_atomic_send(struct fid_ep *ep, const void *buf, size_t co
 static ssize_t sock_ep_atomic_tsendmsg(struct fid_ep *ep, const struct fi_msg_atomic *msg,
 			uint64_t flags)
 {
-	return 0;
+	int i;
+	size_t *bytes_ptr;
+	struct fi_msg_tagged msg_tagged = {0};
+
+	/* scale the count to size to adapt to
+	 * current implementation, also work around the const stuff */
+	for(i=0; i < msg->iov_count; i++) {
+		bytes_ptr = (size_t *) &msg->msg_iov[i].count;
+		(*bytes_ptr) *= fi_datatype_size(msg->datatype);
+	}
+
+	msg_tagged.msg_iov = (const struct iovec *) msg->msg_iov;
+	msg_tagged.desc = msg->desc;
+	msg_tagged.iov_count = msg->iov_count;
+	msg_tagged.addr = msg->addr;
+	msg_tagged.tag = msg->tag;
+	msg_tagged.ignore = 0;
+	msg_tagged.context = msg->context;
+	msg_tagged.data = msg->data;
+
+	return sock_ep_tsendmsg_common(ep, &msg_tagged, flags,
+			msg->op, msg->datatype);
 }
 
 static ssize_t sock_ep_atomic_tsend(struct fid_ep *ep, const void *buf, size_t count, void *desc,
