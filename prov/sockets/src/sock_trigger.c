@@ -380,6 +380,7 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 	switch(sched_ctx->trig_cmd->op_type) {
 	case SOCK_OP_TSEND:
 	case SOCK_OP_TRECV:
+	case SOCK_OP_TSEND_OP:
 		sched_ctx->trig_cmd->op.tmsg.msg.context = trig_ctx;
 		break;
 	default:
@@ -407,8 +408,10 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 	if (user_vertex->num_edges) { /* has children */
 		ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
 				&attr, &cntr, NULL);
-		if (ret)
+		if (ret) {
+			SOCK_LOG_DBG("error opening internal counter\n");
 			return ret;
+		}
 		sock_cntr = container_of(cntr, struct sock_cntr, cntr_fid);
 		slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 	} else { /* leaf node */
@@ -423,8 +426,10 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 			user_vertex->ops[i].internal[0];
 
 		ret = sock_convert_to_trigger_op(sched_ctx, vertex);
-		if (ret)
+		if (ret) {
+			SOCK_LOG_DBG("error converting to triggered op\n");
 			return ret;
+		}
 
 		slist_insert_tail(&sched_ctx->list_entry, &sock_sched->ops);
 	}
@@ -444,7 +449,7 @@ int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags)
 	default:
 		return -FI_EINVAL;
 	}
-	switch (fid->fclass) {
+	switch (bfid->fclass) {
 	case FI_CLASS_CNTR:
 		sock_cntr = container_of(bfid, struct sock_cntr, cntr_fid.fid);
 		break;
