@@ -392,6 +392,34 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 	return 0;
 }
 
+int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags)
+{
+	struct sock_sched *sock_sched;
+	struct sock_cntr *sock_cntr;
+
+	switch (fid->fclass) {
+	case FI_CLASS_SCHED:
+		sock_sched = container_of(fid, struct sock_sched, sched_fid.fid);
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+	switch (bfid->fclass) {
+	case FI_CLASS_CNTR:
+		sock_cntr = container_of(bfid, struct sock_cntr, cntr_fid.fid);
+		break;
+	default:
+		return -FI_EINVAL;
+	}
+
+	sock_sched = container_of(fid, struct sock_sched, sched_fid);
+
+	sock_sched->cmp_cntr = sock_cntr;
+
+	return 0;
+}
+
+
 int sock_explore_vertex(struct sock_ep *sock_ep,
 		struct sock_sched *sock_sched,
 		struct sock_sched_vertex *vertex)
@@ -433,33 +461,6 @@ int sock_explore_vertex(struct sock_ep *sock_ep,
 
 		slist_insert_tail(&sched_ctx->list_entry, &sock_sched->ops);
 	}
-
-	return 0;
-}
-
-int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags)
-{
-	struct sock_sched *sock_sched;
-	struct sock_cntr *sock_cntr;
-
-	switch (fid->fclass) {
-	case FI_CLASS_SCHED:
-		sock_sched = container_of(fid, struct sock_sched, sched_fid.fid);
-		break;
-	default:
-		return -FI_EINVAL;
-	}
-	switch (bfid->fclass) {
-	case FI_CLASS_CNTR:
-		sock_cntr = container_of(bfid, struct sock_cntr, cntr_fid.fid);
-		break;
-	default:
-		return -FI_EINVAL;
-	}
-
-	sock_sched = container_of(fid, struct sock_sched, sched_fid);
-
-	sock_sched->cmp_cntr = sock_cntr;
 
 	return 0;
 }
@@ -607,6 +608,14 @@ int sock_sched_run(struct fid_sched *sched_fid)
 					SOCK_NO_COMPLETION);
 			if (ret)
 				return ret;
+			break;
+		case SOCK_OP_TSEND_OP:
+			ret = sock_ep_tsendmsg_common(&sock_sched->ep->ep,
+					&sched_ctx->trig_cmd->op.tmsg.msg,
+					sched_ctx->trig_cmd->flags |
+					SOCK_NO_COMPLETION,
+					sched_ctx->trig_cmd->op.tmsg.op,
+					sched_ctx->trig_cmd->op.tmsg.datatype);
 			break;
 		default:
 			return -FI_ENOSYS;
