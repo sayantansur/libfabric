@@ -775,64 +775,76 @@ out:
 #define SOCK_ATOMIC_UPDATE_INT(_cmp, _src, _dst, _tmp) do {		\
 	switch (op) {							\
 	case FI_MIN:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		if (*_src < *_dst)					\
 			*_dst = *_src;					\
 		break;							\
 									\
 	case FI_MAX:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		if (*_src > *_dst)					\
 			*_dst = *_src;					\
 		break;							\
 									\
 	case FI_SUM:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst + *_src;					\
 		break;							\
 									\
 	case FI_PROD:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst * *_src;					\
 		break;							\
 									\
 	case FI_LOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst || *_src;					\
 		break;							\
 									\
 	case FI_LAND:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst && *_src;					\
 		break;							\
 									\
 	case FI_BOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst | *_src;					\
 		break;							\
 									\
 	case FI_BAND:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst & *_src;					\
 		break;							\
 									\
 	case FI_LXOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 									\
 		*_dst = ((*_dst && !*_src) || (!*_dst && *_src));	\
 		break;							\
 									\
 	case FI_BXOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst ^ *_src;					\
 		break;							\
 									\
 	case FI_ATOMIC_READ:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		break;							\
 									\
 	case FI_ATOMIC_WRITE:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_src;						\
 		break;							\
 									\
@@ -893,43 +905,51 @@ out:
 #define SOCK_ATOMIC_UPDATE_FLOAT(_cmp, _src, _dst) do {			\
 	switch (op) {							\
 	case FI_MIN:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		if (*_src < *_dst)					\
 			*_dst = *_src;					\
 		break;							\
 									\
 	case FI_MAX:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		if (*_src > *_dst)					\
 			*_dst = *_src;					\
 		break;							\
 									\
 	case FI_SUM:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst + *_src;					\
 		break;							\
 									\
 	case FI_PROD:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst * *_src;					\
 		break;							\
 									\
 	case FI_LOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst || *_src;					\
 		break;							\
 									\
 	case FI_LAND:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst && *_src;					\
 		break;							\
 									\
 	case FI_ATOMIC_READ:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		break;							\
 									\
 	case FI_ATOMIC_WRITE:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_src;						\
 		break;							\
 									\
@@ -984,31 +1004,37 @@ out:
 #define SOCK_ATOMIC_UPDATE_COMPLEX(_cmp, _src, _dst) do {		\
 	switch (op) {							\
 	case FI_SUM:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst + *_src;					\
 		break;							\
 									\
 	case FI_PROD:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst * *_src;					\
 		break;							\
 									\
 	case FI_LOR:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst || *_src;					\
 		break;							\
 									\
 	case FI_LAND:							\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_dst && *_src;					\
 		break;							\
 									\
 	case FI_ATOMIC_READ:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		break;							\
 									\
 	case FI_ATOMIC_WRITE:						\
-		*_cmp = *_dst;						\
+		if (_cmp)						\
+			*_cmp = *_dst;					\
 		*_dst = *_src;						\
 		break;							\
 									\
@@ -2196,6 +2222,7 @@ static int sock_pe_progress_tx_entry(struct sock_pe *pe,
 	switch (pe_entry->msg_hdr.op_type) {
 	case SOCK_OP_SEND:
 	case SOCK_OP_TSEND:
+	case SOCK_OP_TSEND_OP:
 		ret = sock_pe_progress_tx_send(pe, pe_entry, conn);
 		break;
 	case SOCK_OP_WRITE:
