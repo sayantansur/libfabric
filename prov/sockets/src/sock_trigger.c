@@ -414,7 +414,7 @@ int sock_sched_bind(struct fid *fid, struct fid *bfid, uint64_t flags)
 
 	sock_sched = container_of(fid, struct sock_sched, sched_fid);
 
-	sock_sched->cmp_cntr = sock_cntr;
+	sock_sched->user_cmp_cntr = sock_cntr;
 
 	return 0;
 }
@@ -471,7 +471,6 @@ int sock_sched_setup(struct fid_sched *sched_fid,
 	int i, ret;
 	struct slist queue;
 	struct sock_ep *sock_ep;
-	struct sock_cntr *sock_cntr;
 	struct sock_sched *sock_sched;
 	struct fi_sched_ops *user_vertex;
 	struct slist_entry *list_entry;
@@ -480,9 +479,8 @@ int sock_sched_setup(struct fid_sched *sched_fid,
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
 
 	sock_ep = sock_sched->ep;
-	sock_cntr = sock_sched->cmp_cntr;
 
-	if (!sock_cntr) {
+	if (!sock_sched->user_cmp_cntr) {
 		SOCK_LOG_ERROR("No counter bound to schedule\n");
 		return -FI_EINVAL;
 	}
@@ -490,8 +488,6 @@ int sock_sched_setup(struct fid_sched *sched_fid,
 	slist_init(&queue);
 	slist_init(&sock_sched->ops);
 	slist_init(&sock_sched->cntrs);
-
-	slist_insert_tail(&sock_cntr->list_entry, &sock_sched->cntrs);
 
 	SOCK_COMPILE_ASSERT((sizeof(struct sock_sched_vertex) <=
 				(sizeof(struct fi_sched_ops) -
@@ -557,6 +553,10 @@ int sock_sched_close(struct fid *fid)
 			return ret;
 	}
 
+	ret = fi_close(&sock_sched->cmp_cntr->cntr_fid.fid);
+	if (ret)
+		return ret;
+
 	free(sock_sched);
 
 	return 0;
@@ -565,15 +565,15 @@ int sock_sched_close(struct fid *fid)
 int sock_sched_run(struct fid_sched *sched_fid)
 {
 	int ret;
-	struct fid_cq *cq;
-	struct fi_cq_entry cqe;
-	struct sock_cq *sock_cq;
+	uint64_t cmp_threshold;
 	struct sock_cntr *sock_cntr;
 	struct sock_sched *sock_sched;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
 
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
+
+	cmp_threshold = fi_cntr_read(&sock_sched->cmp_cntr->cntr_fid) + 1;
 
 	if (sock_sched->used) {
 		/* we need to reset all the completion counters */
@@ -622,14 +622,9 @@ int sock_sched_run(struct fid_sched *sched_fid)
 		}
 	}
 
-	sock_cq = sock_sched->ep->attr->tx_ctx->comp.send_cq;
-	cq = &sock_cq->cq_fid;
-
-	cqe.op_context = sock_sched->context;
-
-	ret = fi_cq_trig_write(cq, &cqe,
-			&sock_sched->cmp_cntr->cntr_fid,
-			sock_sched->cmp_threshold);
+	ret = fi_cntr_trig_add(&sock_sched->cmp_cntr->cntr_fid,
+			cmp_threshold,
+			&sock_sched->user_cmp_cntr->cntr_fid, 1);
 	if (ret)
 		return ret;
 

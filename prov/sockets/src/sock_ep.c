@@ -593,8 +593,13 @@ static struct fi_ops_sched sched_fid_ops = {
 static int sock_sched_open(struct fid_ep *ep, struct fid_sched **sched_fid,
 		void *context)
 {
+	int ret;
 	struct sock_sched *sock_sched;
 	struct sock_ep *sock_ep;
+	struct fid_cntr *cmp_cntr;
+	struct fi_cntr_attr cntr_attr = { 
+		.events = FI_CNTR_EVENTS_COMP
+	};
 
 	sock_sched = calloc(1, sizeof(*sock_sched));
 	if (!sock_sched)
@@ -609,6 +614,13 @@ static int sock_sched_open(struct fid_ep *ep, struct fid_sched **sched_fid,
 	sock_ep = container_of(ep, struct sock_ep, ep);
 	sock_sched->ep = sock_ep;
 	sock_sched->context = context;
+
+	ret = sock_cntr_open(&sock_ep->attr->domain->dom_fid,
+			&cntr_attr, &cmp_cntr, NULL);
+	if (ret)
+		return ret;
+
+	sock_sched->cmp_cntr = container_of(cmp_cntr, struct sock_cntr, cntr_fid);
 
 	*sched_fid = &sock_sched->sched_fid;
 

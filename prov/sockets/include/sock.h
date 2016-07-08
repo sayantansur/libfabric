@@ -288,6 +288,7 @@ struct sock_sched {
 	struct sock_ep		*ep;
 	struct slist		ops; /* sorted queue of op contexts */
 	struct slist		cntrs; /* list of allocated cmp counters */
+	struct sock_cntr	*user_cmp_cntr;
 	struct sock_cntr	*cmp_cntr; /* indicates completion of all ops */
 	uint64_t		cmp_threshold; /* when the cmp_cntr is triggered */
 	uint32_t		used; /* has this schedule been used */
