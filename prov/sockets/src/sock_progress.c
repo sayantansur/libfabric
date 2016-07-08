@@ -1439,7 +1439,7 @@ static int sock_pe_progress_buffered_rx(struct sock_rx_ctx *rx_ctx)
 				dest_addr = (char *) (uintptr_t) rx_posted->iov[i].iov.addr + dst_offset;
 
 				for (k = 0; k < count; k++) {
-					sock_pe_update_atomic(NULL,
+					sock_pe_update_atomic(dest_addr + k * datatype_sz,
 							      dest_addr + k * datatype_sz,
 							      src_addr + k * datatype_sz,
 							      rx_buffered->datatype,
@@ -2196,6 +2196,7 @@ static int sock_pe_progress_tx_entry(struct sock_pe *pe,
 	switch (pe_entry->msg_hdr.op_type) {
 	case SOCK_OP_SEND:
 	case SOCK_OP_TSEND:
+	case SOCK_OP_TSEND_OP:
 		ret = sock_pe_progress_tx_send(pe, pe_entry, conn);
 		break;
 	case SOCK_OP_WRITE:
