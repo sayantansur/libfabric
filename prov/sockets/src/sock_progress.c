@@ -219,8 +219,6 @@ static struct sock_pe_entry *sock_pe_acquire_entry(struct sock_pe *pe)
 static void sock_pe_report_send_cq_completion(struct sock_pe_entry *pe_entry)
 {
 	int ret = 0;
-	if (pe_entry->cmp_cntr)
-		sock_cntr_inc(pe_entry->cmp_cntr);
 
 	if (!(pe_entry->flags & SOCK_NO_COMPLETION)) {
 		if (pe_entry->comp->send_cq &&
