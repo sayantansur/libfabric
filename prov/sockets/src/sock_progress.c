@@ -280,6 +280,8 @@ static void sock_pe_report_recv_completion(struct sock_pe_entry *pe_entry)
 	sock_pe_report_recv_cq_completion(pe_entry);
 	if (pe_entry->comp->recv_cntr)
 		sock_cntr_inc(pe_entry->comp->recv_cntr);
+	if (pe_entry->cmp_cntr)
+		sock_cntr_inc(pe_entry->cmp_cntr);
 }
 
 static void sock_pe_report_mr_completion(struct sock_domain *domain,
