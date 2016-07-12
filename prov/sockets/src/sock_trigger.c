@@ -565,15 +565,12 @@ int sock_sched_close(struct fid *fid)
 int sock_sched_run(struct fid_sched *sched_fid)
 {
 	int ret;
-	uint64_t cmp_threshold;
 	struct sock_cntr *sock_cntr;
 	struct sock_sched *sock_sched;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
 
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
-
-	cmp_threshold = fi_cntr_read(&sock_sched->cmp_cntr->cntr_fid) + 1;
 
 	if (sock_sched->used) {
 		/* we need to reset all the completion counters */
@@ -623,7 +620,7 @@ int sock_sched_run(struct fid_sched *sched_fid)
 	}
 
 	ret = fi_cntr_trig_add(&sock_sched->cmp_cntr->cntr_fid,
-			cmp_threshold,
+			sock_sched->cmp_threshold,
 			&sock_sched->user_cmp_cntr->cntr_fid, 1);
 	if (ret)
 		return ret;
