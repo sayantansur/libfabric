@@ -375,7 +375,9 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 		trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
 	} else {
 		trig_ctx->event_type = FI_TRIGGER_COMPLETION;
+		trig_ctx->trigger.threshold.threshold = 0;
 	}
+
 
 	switch(sched_ctx->trig_cmd->op_type) {
 	case SOCK_OP_TSEND:
@@ -478,6 +480,8 @@ int sock_sched_setup(struct fid_sched *sched_fid,
 
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
 
+	sock_sched->used = 0;
+
 	sock_ep = sock_sched->ep;
 
 	if (!sock_sched->user_cmp_cntr) {
@@ -565,30 +569,22 @@ int sock_sched_close(struct fid *fid)
 int sock_sched_run(struct fid_sched *sched_fid)
 {
 	int ret;
-	struct sock_cntr *sock_cntr;
 	struct sock_sched *sock_sched;
 	struct slist_entry *list_entry;
 	struct sock_sched_ctx *sched_ctx;
 
 	sock_sched = container_of(sched_fid, struct sock_sched, sched_fid);
 
-	if (sock_sched->used) {
-		/* we need to reset all the completion counters */
-		for (list_entry = sock_sched->cntrs.head; list_entry;
-				list_entry = list_entry->next) {
-			sock_cntr = container_of(list_entry, struct sock_cntr, list_entry);
-			ret = fi_cntr_set(&sock_cntr->cntr_fid, 0);
-			if (ret)
-				return ret;
-		}
-	} else {
-		sock_sched->used = 1;
-	}
+	sock_sched->used++;
 
 	for (list_entry = sock_sched->ops.head; list_entry;
 			list_entry = list_entry->next)
 	{
 		sched_ctx = container_of(list_entry, struct sock_sched_ctx, list_entry);
+
+		/* adjust threshold for this iteration */
+		sched_ctx->trig_ctx.trigger.threshold.threshold *= sock_sched->used;
+
 		switch(sched_ctx->trig_cmd->op_type) {
 		case SOCK_OP_TSEND:
 			ret = sock_ep_tsendmsg(&sock_sched->ep->ep,
@@ -620,7 +616,7 @@ int sock_sched_run(struct fid_sched *sched_fid)
 	}
 
 	ret = fi_cntr_trig_add(&sock_sched->cmp_cntr->cntr_fid,
-			sock_sched->cmp_threshold,
+			sock_sched->cmp_threshold * sock_sched->used,
 			&sock_sched->user_cmp_cntr->cntr_fid, 1);
 	if (ret)
 		return ret;
