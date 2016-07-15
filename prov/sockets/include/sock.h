@@ -306,6 +306,7 @@ struct sock_sched_vertex {
 struct sock_sched_ctx {
 	struct sock_trigger		*trig_cmd;
 	struct slist_entry		list_entry;
+	size_t 				initial_threshold;
 	struct fi_triggered_context	trig_ctx;
 };
 

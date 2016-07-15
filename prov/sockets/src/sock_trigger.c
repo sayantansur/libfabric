@@ -370,11 +370,13 @@ int sock_convert_to_trigger_op(struct sock_sched_ctx *sched_ctx,
 	if (vertex->parent) {
 		parent_user_vertex = (struct fi_sched_ops *)
 			container_of(vertex->parent, struct fi_sched_ops, reserved);
-		trig_ctx->trigger.threshold.threshold = parent_user_vertex->num_ops;
+		sched_ctx->initial_threshold = parent_user_vertex->num_ops;
+		trig_ctx->trigger.threshold.threshold = sched_ctx->initial_threshold;
 		trig_ctx->trigger.threshold.trig_cntr = &vertex->parent->cmp_cntr->cntr_fid;
 		trig_ctx->event_type = FI_TRIGGER_THRESHOLD_COMPLETION;
 	} else {
 		trig_ctx->event_type = FI_TRIGGER_COMPLETION;
+		sched_ctx->initial_threshold = 0;
 		trig_ctx->trigger.threshold.threshold = 0;
 	}
 
@@ -583,7 +585,8 @@ int sock_sched_run(struct fid_sched *sched_fid)
 		sched_ctx = container_of(list_entry, struct sock_sched_ctx, list_entry);
 
 		/* adjust threshold for this iteration */
-		sched_ctx->trig_ctx.trigger.threshold.threshold *= sock_sched->used;
+		sched_ctx->trig_ctx.trigger.threshold.threshold =
+			sched_ctx->initial_threshold * sock_sched->used;
 
 		switch(sched_ctx->trig_cmd->op_type) {
 		case SOCK_OP_TSEND:
